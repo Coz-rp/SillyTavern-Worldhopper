@@ -1,0 +1,149 @@
+<div class="worldhopper-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b class="wh-brand"><i class="fa-solid fa-hurricane"></i> Worldhopper Engine</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content wh-body">
+
+            <!-- What you look at: this chat's modes and bodies. Everything set-and-forget lives under Settings. -->
+            <section class="wh-card">
+                <div class="wh-head">
+                    <span class="wh-title"><i class="fa-solid fa-shapes wh-title-icon"></i>Modes <span id="wh_codex_target" class="wh-sub"></span></span>
+                    <div class="wh-tools">
+                        <i class="wh-help-toggle fa-solid fa-circle-question" data-help="modes" title="How modes work" tabindex="0"></i>
+                        <div id="wh_codex_suggest_now" class="menu_button menu_button_icon fa-solid fa-wand-magic-sparkles" title="Suggest modes from this character's card"></div>
+                        <div id="wh_codex_edit" class="menu_button menu_button_icon fa-solid fa-pen" title="Change this character's modes"></div>
+                    </div>
+                </div>
+                <div class="wh-help" data-help="modes">
+                    Pick the kinds of metaphysics this character uses (possession, mind control, dolls…). Worldhopper then adds the matching Codex rules to every reply in this chat, so the model knows how they work. Every mode is opt-in: nothing you didn't pick ever shows up. Picks are saved per character or group.
+                    <br><i class="fa-solid fa-pen"></i> changes the picks · <i class="fa-solid fa-wand-magic-sparkles"></i> suggests some from the card · tap a picked mode to see what it means.
+                </div>
+                <div id="wh_codex_picked" class="wh-picked"></div>
+                <div id="wh_codex_suggestion" class="wh-suggestion" style="display:none">
+                    <span id="wh_codex_suggestion_text"></span>
+                    <div id="wh_codex_apply_suggestion" class="menu_button">Apply</div>
+                </div>
+                <div id="wh_codex_modes" class="wh-modes" style="display:none"></div>
+            </section>
+
+            <section class="wh-card">
+                <div class="wh-head">
+                    <span class="wh-title"><i class="fa-solid fa-people-arrows wh-title-icon"></i>Body Ledger</span>
+                    <div class="wh-tools">
+                        <i class="wh-help-toggle fa-solid fa-circle-question" data-help="ledger" title="How the Body Ledger works" tabindex="0"></i>
+                        <div id="wh_ledger_open" class="menu_button menu_button_icon fa-solid fa-pen" title="Edit the ledger"></div>
+                        <div id="wh_ledger_rebuild" class="menu_button menu_button_icon fa-solid fa-rotate" title="Rebuild from the card and recent messages"></div>
+                    </div>
+                </div>
+                <div class="wh-help" data-help="ledger">
+                    Keeps track of who is in which body (possession, swaps, skinsuits, copies, puppets…), whose mind has been changed and how (hypnosis, mind control, rewrites, drones, dolls…, with any triggers), and who has which power. It updates after each reply in chats that have a mode, and goes into the prompt so names, pronouns and every change stay straight. <span class="wh-key wh-key-you"></span> teal rows are yours; <span class="wh-key wh-key-npc"></span> violet rows are someone else's. Timestop alone gives it nothing to track, so it stays off.
+                    <br><i class="fa-solid fa-pen"></i> fixes a mistake (the next update builds on your fix) · <i class="fa-solid fa-rotate"></i> reads the chat again from scratch · tap a row to see its details.
+                </div>
+                <div id="wh_ledger_summary" class="wh-box"></div>
+                <div id="wh_ledger_history" class="wh-box wh-history"></div>
+            </section>
+
+            <div class="wh-status">
+                <small id="wh_ledger_status"></small>
+                <small id="wh_editor_status"></small>
+            </div>
+
+            <div class="inline-drawer wh-settings">
+                <div class="inline-drawer-toggle inline-drawer-header">
+                    <span><i class="fa-solid fa-gear"></i> Settings</span>
+                    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                </div>
+                <div class="inline-drawer-content">
+
+                    <section class="wh-section">
+                        <div class="wh-group"><i class="fa-solid fa-microchip"></i><span>Models</span> <i class="wh-help-toggle fa-solid fa-circle-question" data-help="models" title="Which model does what" tabindex="0"></i></div>
+                        <div class="wh-help" data-help="models">
+                            Worldhopper's background jobs run through your connection profiles (plug menu → Connection Profile), separate from the model you chat with. Give them their own model: a local one (KoboldCpp, Ollama…) or a cheap, fast API model (the Flash, Haiku or mini tier). The jobs are small and the Ledger runs after every reply, so that keeps things quick and costs next to nothing; your big roleplay model would work, but at big-model prices on every reply, and your next reply waits for the Ledger. A job with no model picked simply doesn't run.
+                        </div>
+                        <div class="wh-tip"><i class="fa-solid fa-bolt"></i><span><b>Fast and cheap:</b> use a local or budget model here, not your roleplay model.</span></div>
+                        <div id="wh_no_profiles" class="wh-warning" style="display:none">No connection profiles yet. Save one in the plug menu (Connection Profile), then pick it here.</div>
+                        <label class="wh-field wh-stack">
+                            <span><b>Ledger &amp; suggestions</b><small>Updates the Body Ledger after every reply and suggests modes for new characters. Runs the most, so pick your fastest, cheapest model.</small></span>
+                            <select id="wh_ledger_profile" class="text_pole"></select>
+                        </label>
+                        <label class="wh-field wh-stack">
+                            <span><b>Editor</b><small>Rewrites the lines the Editor flags. A cheap model does this well.</small></span>
+                            <select id="wh_editor_profile" class="text_pole"></select>
+                        </label>
+                        <label class="wh-field wh-stack">
+                            <span><b>Notes &amp; reviews</b><small>Writes Body History notes and runs Check card's deeper review. Runs rarely; a cheap model works, and a slightly better one reads a little closer.</small></span>
+                            <select id="wh_ledger_notes_profile" class="text_pole"></select>
+                        </label>
+                    </section>
+
+                    <section class="wh-section">
+                        <div class="wh-group"><i class="fa-solid fa-book"></i><span>Codex</span> <i class="wh-help-toggle fa-solid fa-circle-question" data-help="codex" title="What the Codex settings do" tabindex="0"></i></div>
+                        <div class="wh-help" data-help="codex">
+                            The Codex is a lorebook of metaphysics rules that comes with the extension. Its entries stay off everywhere; Worldhopper turns on only the ones for the modes you picked, and only in that character's chats.
+                        </div>
+                        <div class="wh-switches">
+                            <label class="wh-switch" for="wh_codex_enabled"><input type="checkbox" id="wh_codex_enabled"><span><b>Codex rules</b><small>Adds the rules for the modes you picked. Off turns every mode off.</small></span></label>
+                            <label class="wh-switch" for="wh_codex_initiative"><input type="checkbox" id="wh_codex_initiative"><span><b>Powers get used</b><small>Characters use their powers on their own initiative, without hesitating or asking permission.</small></span></label>
+                            <label class="wh-switch" for="wh_codex_anchors"><input type="checkbox" id="wh_codex_anchors"><span><b>Mode reminders</b><small>A one-line reminder per picked mode, near the end of the prompt, where it carries the most weight.</small></span></label>
+                            <label class="wh-switch" for="wh_codex_details"><input type="checkbox" id="wh_codex_details"><span><b>Detail entries</b><small>Extra rules that switch on when the chat touches their topic, like trance depth or a skinsuit going on.</small></span></label>
+                            <label class="wh-switch" for="wh_codex_suggest"><input type="checkbox" id="wh_codex_suggest"><span><b>Suggest for new characters</b><small>The first time you open a character with no modes, suggest some from its card.</small></span></label>
+                        </div>
+                        <label class="wh-field wh-stack">
+                            <span><b>Codex lorebook</b><small>WH Metaphysics comes with the extension and installs and updates itself.</small></span>
+                            <select id="wh_codex_world" class="text_pole"></select>
+                        </label>
+                        <div id="wh_codex_update" class="wh-warning" style="display:none">
+                            This version of Worldhopper has a newer Codex, but your WH Metaphysics lorebook has edits of your own, so it was left alone.
+                            <div id="wh_codex_update_now" class="menu_button wh-wide-button">Update (keep mine as a copy)</div>
+                        </div>
+                    </section>
+
+                    <section class="wh-section">
+                        <div class="wh-group"><i class="fa-solid fa-people-arrows"></i><span>Ledger</span> <i class="wh-help-toggle fa-solid fa-circle-question" data-help="ledger-settings" title="What the Ledger settings do" tabindex="0"></i></div>
+                        <div class="wh-help" data-help="ledger-settings">
+                            Teal means you're the one doing it (inside a body, or controlling a mind); violet means someone else is. In the body roster, tap a body's card to start a line like <code>[Kayla] </code> and write what that body does; a line with no name is you as a whole. The writer only ever does what you wrote with your bodies: one you gave nothing stays as you left it.
+                        </div>
+                        <div class="wh-switches">
+                            <label class="wh-switch" for="wh_ledger_enabled"><input type="checkbox" id="wh_ledger_enabled"><span><b>Body Ledger</b><small>Tracks bodies, changed minds and powers after each reply, in chats that have a mode.</small></span></label>
+                            <label class="wh-switch" for="wh_ledger_strip_on"><input type="checkbox" id="wh_ledger_strip_on"><span><b>Strip above the chat</b><small>Every borrowed body and changed mind at a glance. Tap it to edit.</small></span></label>
+                            <label class="wh-switch" for="wh_ledger_badges_on"><input type="checkbox" id="wh_ledger_badges_on"><span><b>"As …" badges</b><small>Your messages show whose body you wrote them from.</small></span></label>
+                            <label class="wh-switch" for="wh_ledger_lanes_on"><input type="checkbox" id="wh_ledger_lanes_on"><span><b>Body roster</b><small>While you run more than one body, a colour-coded card per body sits over the message box and starts a line for it.</small></span></label>
+                            <label class="wh-switch" for="wh_ledger_history_on"><input type="checkbox" id="wh_ledger_history_on"><span><b>Body History</b><small>Remembers past body changes: who was inside, what the owner remembers, what was kept.</small></span></label>
+                        </div>
+                        <div id="wh_ledger_backfill" class="menu_button wh-wide-button" title="For a chat that started before the Ledger was on: read every earlier reply to build the history. About 1 s per reply; click again to stop."><i class="fa-solid fa-clock-rotate-left"></i> Build history from whole chat</div>
+                    </section>
+
+                    <section class="wh-section">
+                        <div class="wh-group"><i class="fa-solid fa-spell-check"></i><span>Editor</span> <i class="wh-help-toggle fa-solid fa-circle-question" data-help="editor" title="How the Editor works" tabindex="0"></i></div>
+                        <div class="wh-help" data-help="editor">
+                            After each reply, a quick rule pass flags suspect lines and the Editor model rewrites only those; nothing else in the reply changes. <i class="fa-solid fa-rotate-left"></i> in a message's menu switches between the original and the fixed version.
+                        </div>
+                        <div class="wh-switches">
+                            <label class="wh-switch" for="wh_editor_enabled"><input type="checkbox" id="wh_editor_enabled"><span><b>Editor</b><small>Fixes the flagged lines after each reply.</small></span></label>
+                            <label class="wh-switch" for="wh_editor_cc_only"><input type="checkbox" id="wh_editor_cc_only"><span><b>Chat Completion replies only</b><small>Style fixes skip Text Completion replies. Pronouns and body rules still run on every reply.</small></span></label>
+                        </div>
+                        <div class="wh-subhead">What it fixes</div>
+                        <div class="wh-pills">
+                            <label class="wh-pill" for="wh_chk_banlist" title="Stock phrases and common model tells"><input type="checkbox" id="wh_chk_banlist"><span>Stock phrases</span></label>
+                            <label class="wh-pill" for="wh_chk_contrast" title="&quot;Not X, but Y&quot; framing"><input type="checkbox" id="wh_chk_contrast"><span>Not X, but Y</span></label>
+                            <label class="wh-pill" for="wh_chk_staccato" title="Chopped dialogue fragments"><input type="checkbox" id="wh_chk_staccato"><span>Chopped dialogue</span></label>
+                            <label class="wh-pill" for="wh_chk_fragments" title="Narration fragments"><input type="checkbox" id="wh_chk_fragments"><span>Fragments</span></label>
+                            <label class="wh-pill" for="wh_chk_hedges" title="Referent hedges like &quot;your — her — hand&quot;"><input type="checkbox" id="wh_chk_hedges"><span>Hedges</span></label>
+                            <label class="wh-pill" for="wh_chk_echo" title="Speech that echoes your words back"><input type="checkbox" id="wh_chk_echo"><span>Echoing you</span></label>
+                            <label class="wh-pill" for="wh_chk_repetition" title="Phrases repeated from recent replies"><input type="checkbox" id="wh_chk_repetition"><span>Repeats</span></label>
+                            <label class="wh-pill" for="wh_editor_pronouns" title="Pronouns for a body and for the mind inside it, checked against the Ledger"><input type="checkbox" id="wh_editor_pronouns"><span>Pronouns</span></label>
+                            <label class="wh-pill" for="wh_editor_lint" title="Cuts lines that break the body rules: one mind's bodies chatting with each other, narration pointing out who's inside, hints at changes you haven't been told about. Uses the Ledger."><input type="checkbox" id="wh_editor_lint"><span>Body rules</span></label>
+                        </div>
+                        <label class="wh-field wh-stack">
+                            <span><b>Slop list</b><small>Phrases the Editor always fixes. One per line; # starts a comment.</small></span>
+                            <textarea id="wh_editor_personal" class="text_pole textarea_compact" rows="4" placeholder="doesn't quite reach her eyes"></textarea>
+                        </label>
+                        <div id="wh_editor_run" class="menu_button wh-wide-button" title="Run the Editor on the last reply now, even if it's off"><i class="fa-solid fa-wand-sparkles"></i> Run Editor on last reply</div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,731 @@
+/* ---------- Settings panel: two cards up front (modes, ledger), everything else under Settings ---------- */
+.worldhopper-settings {
+    --wh-accent: var(--SmartThemeQuoteColor, #e18a24);
+    --wh-line: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.15));
+}
+.worldhopper-settings .wh-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 6px;
+}
+.worldhopper-settings .wh-card {
+    padding: 8px 10px;
+    border: 1px solid var(--wh-line);
+    border-radius: 8px;
+    background: var(--black30a, rgba(0, 0, 0, 0.15));
+}
+.worldhopper-settings .wh-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+}
+.worldhopper-settings .wh-title {
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.worldhopper-settings .wh-sub {
+    font-weight: 400;
+    opacity: 0.6;
+}
+.worldhopper-settings .wh-tools {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.worldhopper-settings .wh-tools .menu_button {
+    margin: 0;
+    padding: 4px 7px;
+    font-size: 0.85em;
+}
+.worldhopper-settings .wh-tools .menu_button.wh-on {
+    color: var(--wh-accent);
+    border-color: var(--wh-accent);
+}
+
+/* Picked modes as chips; the full picker opens with the pen. */
+.worldhopper-settings .wh-picked {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+.worldhopper-settings .wh-chip {
+    --wh-g: var(--wh-accent);
+    padding: 1px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--wh-g);
+    background: color-mix(in srgb, var(--wh-g) 22%, transparent);
+    font-size: 0.9em;
+    cursor: pointer;
+}
+/* One colour per family of modes, in the chips and in the picker's pills. */
+.worldhopper-settings .wh-g-occupancy { --wh-g: #9b8cff; }
+.worldhopper-settings .wh-g-overwrite { --wh-g: #e46a9a; }
+.worldhopper-settings .wh-g-reduction { --wh-g: #d9a24a; }
+.worldhopper-settings .wh-g-other { --wh-g: #5fb7a4; }
+.worldhopper-settings .wh-mode-group .wh-pill:has(input:checked) {
+    border-color: var(--wh-g);
+    background: color-mix(in srgb, var(--wh-g) 22%, transparent);
+}
+.worldhopper-settings .wh-mode-group-title { color: var(--wh-g); opacity: 0.85 !important; }
+.worldhopper-settings .wh-empty {
+    opacity: 0.6;
+    font-size: 0.9em;
+}
+.worldhopper-settings .wh-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    font-size: 0.9em;
+}
+.worldhopper-settings .wh-suggestion .menu_button { margin: 0; padding: 2px 10px; }
+.worldhopper-settings .wh-modes {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.worldhopper-settings .wh-mode-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+.worldhopper-settings .wh-mode-group-title {
+    width: 100%;
+    font-size: 0.75em;
+    opacity: 0.55;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Tap-to-toggle pills: mode picker and Editor checks. */
+:is(.worldhopper-settings, .wh-cardtool) .wh-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 6px 0;
+}
+:is(.worldhopper-settings, .wh-cardtool) .wh-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--wh-line);
+    font-size: 0.88em;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0.75;
+    transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+}
+:is(.worldhopper-settings, .wh-cardtool) .wh-pill input { display: none; }
+:is(.worldhopper-settings, .wh-cardtool) .wh-pill:has(input:checked) {
+    opacity: 1;
+    border-color: var(--wh-accent);
+    background: color-mix(in srgb, var(--wh-accent) 22%, transparent);
+}
+:is(.worldhopper-settings, .wh-cardtool) .wh-pill.wh-modifier { border-style: dashed; }
+:is(.worldhopper-settings, .wh-cardtool) .wh-pill:has(input:disabled) { opacity: 0.35; cursor: default; }
+
+/* Ledger rows: "Body ← Mind", details on one faint line that expands on tap. */
+.worldhopper-settings .wh-box {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 6px;
+    font-size: 0.9em;
+}
+.worldhopper-settings .wh-box.wh-history {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--wh-line);
+}
+.worldhopper-settings .wh-row { min-width: 0; }
+.worldhopper-settings .wh-row.wh-expandable { cursor: pointer; }
+.worldhopper-settings .wh-row-main { font-weight: 500; }
+.worldhopper-settings .wh-row-main .fa-eye-slash { opacity: 0.6; font-size: 0.85em; }
+.worldhopper-settings .wh-row-sub {
+    font-size: 0.88em;
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.worldhopper-settings .wh-row.wh-open .wh-row-sub { white-space: normal; }
+.worldhopper-settings .wh-row-sub.wh-extra { white-space: normal; }
+.worldhopper-settings .wh-mini-title {
+    font-size: 0.75em;
+    opacity: 0.55;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.worldhopper-settings .wh-status {
+    display: flex;
+    flex-direction: column;
+    opacity: 0.55;
+    font-size: 0.85em;
+    padding: 0 2px;
+}
+.worldhopper-settings .wh-status small:empty { display: none; }
+
+/* Header and card titles */
+.worldhopper-settings .wh-brand i {
+    margin-right: 4px;
+    background: linear-gradient(135deg, #ff5d8f, #b27eff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+/* The theme's accent everywhere (some themes recolour icons; the switches and icons should match). */
+.worldhopper-settings .wh-title-icon { margin-right: 7px; color: var(--wh-accent) !important; opacity: 0.9; }
+
+/* Settings drawer: one section per job, each with an icon, and every option explained where you can see it. */
+.worldhopper-settings .wh-settings > .inline-drawer-header {
+    font-size: 0.95em;
+    opacity: 0.85;
+}
+.worldhopper-settings .wh-section {
+    margin-top: 10px;
+    padding: 8px 10px 10px;
+    border: 1px solid var(--wh-line);
+    border-radius: 10px;
+    background: var(--black30a, rgba(0, 0, 0, 0.15));
+}
+.worldhopper-settings .wh-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 6px;
+    font-weight: 600;
+    font-size: 0.95em;
+}
+.worldhopper-settings .wh-group > i:first-child { width: 16px; text-align: center; color: var(--wh-accent) !important; }
+.worldhopper-settings .wh-group .wh-help-toggle { margin-left: auto; font-weight: 400; }
+.worldhopper-settings .wh-tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 2px 0 6px;
+    padding: 6px 9px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--wh-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--wh-accent) 10%, transparent);
+    font-size: 0.85em;
+    line-height: 1.3;
+}
+.worldhopper-settings .wh-tip > i { margin-top: 2px; color: var(--wh-accent) !important; }
+.worldhopper-settings .wh-tip b { font-weight: 600; }
+.worldhopper-settings .wh-subhead {
+    margin: 10px 0 2px;
+    font-size: 0.75em;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Switches: a toggle with its name and a one-line explanation beside it. */
+.worldhopper-settings .wh-switches { display: flex; flex-direction: column; gap: 2px; }
+.worldhopper-settings .wh-switch {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 6px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.12s;
+}
+.worldhopper-settings .wh-switch:hover { background: rgba(255, 255, 255, 0.04); }
+.worldhopper-settings .wh-switch > span { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.worldhopper-settings .wh-switch b { font-weight: 500; }
+.worldhopper-settings .wh-switch small { margin-top: 2px; font-size: 0.8em; opacity: 0.62; }
+.worldhopper-settings .wh-switch input[type='checkbox'] {
+    width: 34px;
+    height: 20px;
+    margin: 1px 0 0;
+    border-radius: 999px;
+    outline: none;
+    border: 1px solid var(--wh-line);
+    background-color: rgba(255, 255, 255, 0.14);
+    box-shadow: none;
+    filter: none;
+    transform: none;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+.worldhopper-settings .wh-switch input[type='checkbox']::before {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    clip-path: none;
+    box-shadow: none;
+    background: #f2eef0;
+    transform: translateX(-7px);
+    transition: transform 0.15s ease;
+}
+/* !important: some themes force their own colour onto checked boxes, which left the switches and icons mismatched. */
+.worldhopper-settings .wh-switch input[type='checkbox']:checked {
+    background-color: var(--wh-accent) !important;
+    border-color: var(--wh-accent) !important;
+}
+.worldhopper-settings .wh-switch input[type='checkbox']:checked::before { transform: translateX(7px); }
+.worldhopper-settings .wh-switch input[type='checkbox']:focus-visible { outline: 2px solid var(--wh-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+    .worldhopper-settings .wh-switch input[type='checkbox'],
+    .worldhopper-settings .wh-switch input[type='checkbox']::before { transition: none; }
+}
+
+.worldhopper-settings .wh-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0 4px;
+}
+.worldhopper-settings .wh-field > span {
+    flex: 0 0 132px;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+.worldhopper-settings .wh-field select { margin: 0; flex: 1; min-width: 0; }
+.worldhopper-settings .wh-field.wh-stack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+/* Stacked, the label sits above its box: the side-by-side label width would become its height. */
+.worldhopper-settings .wh-field.wh-stack > span { flex: none; display: flex; flex-direction: column; opacity: 1; font-size: 1em; }
+.worldhopper-settings .wh-field.wh-stack > span b { font-weight: 500; }
+.worldhopper-settings .wh-field.wh-stack > span small { font-size: 0.8em; opacity: 0.62; line-height: 1.25; }
+.worldhopper-settings .wh-wide-button {
+    width: fit-content;
+    margin: 8px 0 0;
+}
+.worldhopper-settings .wh-wide-button i { margin-right: 4px; }
+
+/* Ledger rows carry the strip's colours: teal yours, violet someone else's, dashed when nobody is inside. */
+.worldhopper-settings .wh-box .wh-row { padding-left: 8px; border-left: 3px solid transparent; }
+.worldhopper-settings .wh-box .wh-row.wh-k-you { border-left-color: rgba(29, 158, 117, 0.9); }
+.worldhopper-settings .wh-box .wh-row.wh-k-npc { border-left-color: rgba(127, 119, 221, 0.9); }
+.worldhopper-settings .wh-box .wh-row.wh-k-idle { border-left: 3px dashed rgba(255, 255, 255, 0.25); }
+.worldhopper-settings .wh-row-main .wh-row-icon { margin-right: 5px; font-size: 0.85em; opacity: 0.7; }
+.worldhopper-settings .wh-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
+.worldhopper-settings .wh-key-you { background: rgb(29, 158, 117); }
+.worldhopper-settings .wh-key-npc { background: rgb(127, 119, 221); }
+
+/* Ledger editor popup: one collapsed line per body, tap to edit */
+.wh-ledger-editor {
+    text-align: left;
+    --wh-line: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.15));
+}
+.wh-ledger-editor .wh-muted { opacity: 0.65; display: block; margin-bottom: 6px; }
+.wh-ledger-editor .wh-mini-title {
+    margin: 12px 0 2px;
+    font-size: 0.75em;
+    opacity: 0.55;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.wh-ledger-editor .wh-ledger-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0;
+}
+.wh-ledger-editor .wh-body-card {
+    border: 1px solid var(--wh-line);
+    border-radius: 6px;
+}
+.wh-ledger-editor .wh-body-card > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 4px 4px 10px;
+    cursor: pointer;
+    list-style: none;
+}
+.wh-ledger-editor .wh-body-card > summary::-webkit-details-marker { display: none; }
+.wh-ledger-editor .wh-body-title { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wh-ledger-editor .wh-body-title small { opacity: 0.6; font-weight: 400; }
+.wh-ledger-editor .wh-fields {
+    display: grid;
+    grid-template-columns: 1fr minmax(70px, 110px);
+    gap: 4px 6px;
+    padding: 2px 10px 10px;
+}
+.wh-ledger-editor .wh-full { grid-column: 1 / -1; }
+.wh-ledger-editor .wh-f { display: flex; flex-direction: column; min-width: 0; margin: 0; }
+.wh-ledger-editor .wh-f small { font-size: 0.75em; opacity: 0.6; }
+.wh-ledger-editor .wh-f input { margin: 0; }
+.wh-ledger-editor .wh-pair {
+    display: grid;
+    grid-template-columns: minmax(90px, 1fr) minmax(140px, 2fr) auto;
+    gap: 6px;
+    align-items: end;
+}
+.wh-ledger-editor .wh-row-del {
+    margin: 0;
+    padding: 4px 7px;
+    font-size: 0.85em;
+    flex-shrink: 0;
+}
+
+/* The ⟲ toggle only appears on messages the Editor actually changed. */
+.mes .wh-undo {
+    display: none;
+}
+.mes.wh-edited .wh-undo {
+    display: flex;
+}
+
+/* Ledger strip above the chat: one two-line chip per body. Teal = you're the one inside, violet = someone else. */
+.wh-ledger-strip {
+    --wh-you: 29, 158, 117;
+    --wh-npc: 127, 119, 221;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* #sheld is a fixed-height column that #chat fills: without this the strip is squeezed to nothing on desktop
+       and its chips spill over the first message. */
+    flex-shrink: 0;
+    min-height: 46px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: none;
+    padding: 6px 8px;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+    /* Styled like ST's message box at the bottom (a rounded panel inside the chat column), so it doesn't read as
+       a narrower extension of the full-width top bar with the background showing at both ends. */
+    margin: 5px 0 3px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
+    border-radius: 10px;
+    background: var(--SmartThemeBlurTintColor, rgba(24, 24, 24, 0.95));
+    backdrop-filter: blur(var(--SmartThemeBlurStrength, 8px));
+}
+.wh-ledger-strip::-webkit-scrollbar { display: none; }
+.wh-ledger-strip .wh-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 14px 0 11px;
+    border-radius: 17px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+}
+.wh-ledger-strip .wh-chip-icon { font-size: 15px; opacity: 0.85; width: 16px; text-align: center; }
+.wh-ledger-strip .wh-chip-text { display: flex; flex-direction: column; justify-content: center; line-height: 1.2; }
+.wh-ledger-strip .wh-chip-text b { font-weight: 600; font-size: 13px; }
+.wh-ledger-strip .wh-chip-text small { font-size: 11px; opacity: 0.7; }
+.wh-ledger-strip .wh-chip.wh-you { border-color: rgba(var(--wh-you), 0.95); background: rgba(var(--wh-you), 0.22); }
+.wh-ledger-strip .wh-chip.wh-you .wh-chip-icon { color: rgb(var(--wh-you)); opacity: 1; }
+.wh-ledger-strip .wh-chip.wh-npc { border-color: rgba(var(--wh-npc), 0.6); background: rgba(var(--wh-npc), 0.14); }
+.wh-ledger-strip .wh-chip.wh-npc .wh-chip-icon { color: rgb(var(--wh-npc)); opacity: 1; }
+.wh-ledger-strip .wh-chip.wh-empty,
+.wh-ledger-strip .wh-chip.wh-mind { border-style: dashed; }
+.wh-ledger-strip .wh-chip.wh-hidden { border-style: dashed; }
+.wh-ledger-strip .wh-chip.wh-hidden .wh-chip-text { font-style: italic; }
+.wh-ledger-strip .wh-busy { opacity: 0.55; font-style: italic; font-size: 0.8em; }
+
+/* "as (name)" next to your name when you're in someone else's body. */
+.mes .wh-as {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 8px;
+    padding: 1px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(29, 158, 117, 0.95);
+    background: rgba(29, 158, 117, 0.22);
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+    align-self: center;
+}
+.mes .wh-as i { color: rgb(29, 158, 117); }
+
+/* The body roster over the message box while you run several bodies: a card per body, in that body's colour
+   (--wh-hue, set per card), each starting a "[Name] " line. The card for the line you're writing is outlined. */
+.wh-lanes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+    max-height: 132px;
+    overflow-y: auto;
+    padding: 6px 8px 2px;
+}
+.wh-lane-card {
+    --wh-hue: 29, 158, 117;
+    flex: 1 1 150px;
+    max-width: 240px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    padding: 4px 10px 5px;
+    border-radius: 10px;
+    border: 1px solid rgba(var(--wh-hue), 0.45);
+    background: rgba(var(--wh-hue), 0.09);
+    color: var(--SmartThemeBodyColor);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.wh-lane-card:hover,
+.wh-lane-card:focus-visible { background: rgba(var(--wh-hue), 0.18); outline: none; }
+.wh-lane-card.wh-has { background: rgba(var(--wh-hue), 0.2); }
+.wh-lane-card.wh-on { border-color: rgb(var(--wh-hue)); box-shadow: inset 0 0 0 1px rgb(var(--wh-hue)); }
+.wh-lane-top { display: flex; align-items: center; gap: 6px; max-width: 100%; font-size: 0.85em; }
+.wh-lane-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wh-lane-top small { opacity: 0.65; }
+.wh-lane-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--wh-hue)); }
+.wh-lane-status { max-width: 100%; font-size: 0.72em; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wh-lane-card.wh-on .wh-lane-status,
+.wh-lane-card.wh-has .wh-lane-status { opacity: 1; }
+.wh-lanes.wh-compact .wh-lane-card { flex: 0 0 auto; padding: 3px 12px; border-radius: 999px; }
+.wh-lanes.wh-compact .wh-lane-status { display: none; }
+.wh-lanes-size {
+    align-self: center;
+    margin-left: auto;
+    padding: 4px 6px;
+    border: none;
+    background: none;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.5;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+.wh-lanes-size:hover { opacity: 0.9; }
+@media (prefers-reduced-motion: reduce) { .wh-lane-card { transition: none; } }
+
+/* Those lines in your messages (the WH - Body lines script): one labelled row per body, in the roster's colours. */
+.mes_text .custom-wh-lane {
+    --wh-hue: 29, 158, 117;
+    margin: 0.3em 0;
+    padding: 0.15em 0.6em;
+    border-left: 3px solid rgba(var(--wh-hue), 0.85);
+    border-radius: 0 6px 6px 0;
+    background: rgba(var(--wh-hue), 0.07);
+}
+.mes_text .custom-wh-lane > p { margin: 0; }
+.mes_text .custom-wh-lane-name {
+    display: inline-block;
+    margin-right: 0.45em;
+    padding: 0 0.6em;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--wh-hue), 0.7);
+    background: rgba(var(--wh-hue), 0.2);
+    font-size: 0.8em;
+    font-weight: 600;
+    font-style: normal;
+    vertical-align: 0.08em;
+}
+
+/* Make card / Check card popups */
+.wh-cardtool {
+    text-align: left;
+    --wh-accent: var(--SmartThemeQuoteColor, #e18a24);
+    --wh-line: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.15));
+}
+.wh-cardtool h3 { margin: 0 0 8px; }
+.wh-cardtool .wh-muted { opacity: 0.65; }
+.wh-cardtool .wh-mini-title {
+    margin: 12px 0 4px;
+    font-size: 0.75em;
+    opacity: 0.55;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.wh-cardtool .wh-card-name { display: flex; flex-direction: column; margin: 0 0 2px; }
+.wh-cardtool .wh-card-name small { font-size: 0.75em; opacity: 0.6; }
+.wh-cardtool .wh-card-fields {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    margin: 10px 0;
+    padding: 6px 10px;
+    border: 1px solid var(--wh-line);
+    border-radius: 6px;
+}
+.wh-cardtool .wh-card-meta { display: flex; flex-direction: column; gap: 4px; }
+.wh-cardtool .wh-card-chip {
+    display: inline-block;
+    margin: 2px 4px 2px 0;
+    padding: 1px 8px;
+    border: 1px solid var(--wh-accent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--wh-accent) 22%, transparent);
+    font-size: 0.9em;
+}
+.wh-cardtool .wh-card-missing { color: var(--warning, #e0a030); }
+.wh-cardtool .wh-doctor { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.wh-cardtool .wh-doctor-ok { opacity: 0.8; }
+.wh-cardtool .wh-doctor-ok i { color: rgb(29, 158, 117); }
+.wh-cardtool .wh-doctor-item { border: 1px solid var(--wh-line); border-radius: 6px; }
+.wh-cardtool .wh-doctor-item > summary { display: flex; gap: 8px; align-items: baseline; padding: 4px 10px; cursor: pointer; list-style: none; }
+.wh-cardtool .wh-doctor-item > summary::-webkit-details-marker { display: none; }
+.wh-cardtool .wh-doctor-item.wh-warn > summary i { color: var(--warning, #e0a030); }
+.wh-cardtool .wh-doctor-item.wh-info > summary i { opacity: 0.6; }
+.wh-cardtool .wh-doctor-detail { padding: 0 10px 8px 32px; opacity: 0.8; font-size: 0.92em; }
+.wh-cardtool .wh-card-review { display: inline-flex; gap: 6px; align-items: center; width: fit-content; }
+.wh-cardtool .wh-card-review-out { white-space: pre-wrap; margin-top: 8px; }
+.wh-cardtool .wh-card-review-out:empty { display: none; }
+.wh-cardtool .wh-doctor-detail q { display: block; margin-bottom: 4px; font-style: italic; opacity: 0.9; }
+
+/* (?) help: a short how-to that opens under its heading on tap (tooltips don't exist on phones). */
+.worldhopper-settings .wh-help-toggle {
+    cursor: pointer;
+    opacity: 0.55;
+    font-size: 0.95em;
+    padding: 2px;
+    align-self: center;
+    text-transform: none;
+}
+.worldhopper-settings .wh-help-toggle:hover,
+.worldhopper-settings .wh-help-toggle.wh-on { opacity: 1; color: var(--wh-accent); }
+.worldhopper-settings .wh-group .wh-help-toggle { font-size: 1.15em; }
+.worldhopper-settings .wh-help {
+    display: none;
+    margin: 6px 0 4px;
+    padding: 6px 10px;
+    border-left: 2px solid var(--wh-accent);
+    border-radius: 0 6px 6px 0;
+    background: color-mix(in srgb, var(--wh-accent) 8%, transparent);
+    font-size: 0.86em;
+    line-height: 1.45;
+    opacity: 0.9;
+}
+.worldhopper-settings .wh-help.wh-open { display: block; }
+.worldhopper-settings .wh-help i { opacity: 0.8; }
+.worldhopper-settings .wh-warning {
+    margin: 6px 0;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--warning, #e0a030) 60%, transparent);
+    background: color-mix(in srgb, var(--warning, #e0a030) 10%, transparent);
+    font-size: 0.86em;
+}
+.worldhopper-settings .wh-picked .wh-chip { cursor: pointer; }
+.worldhopper-settings .wh-blurb {
+    margin-top: 6px;
+    font-size: 0.86em;
+    opacity: 0.85;
+}
+
+/* Possession and release. The writer marks them (%%possession%% … %%/possession%%, %%release%% … %%/release%%) and the
+   WH - Possession / WH - Release regex scripts turn them into these boxes (ST prefixes message classes with custom-). */
+.mes_text .custom-wh-possess,
+.mes_text .custom-wh-release {
+    position: relative;
+    margin: 0.9em 0;
+    padding: 0.55em 1.1em 0.65em;
+    border-radius: 12px;
+}
+.mes_text .custom-wh-possess {
+    border: 1px solid rgba(178, 126, 255, 0.45);
+    background: linear-gradient(135deg, rgba(118, 70, 230, 0.16), rgba(214, 64, 170, 0.1));
+    box-shadow: inset 0 0 24px rgba(160, 100, 255, 0.14), 0 0 16px rgba(160, 100, 255, 0.12);
+}
+.mes_text .custom-wh-release {
+    border: 1px dashed rgba(190, 180, 220, 0.35);
+    background: rgba(150, 140, 180, 0.07);
+}
+.mes_text .custom-wh-possess::before,
+.mes_text .custom-wh-release::before {
+    display: block;
+    margin-bottom: 0.35em;
+    text-align: center;
+    font-size: 0.68em;
+    font-style: normal;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+}
+.mes_text .custom-wh-possess::before { content: '◈ possession ◈'; color: rgba(206, 180, 255, 0.75); }
+.mes_text .custom-wh-release::before { content: '◇ release ◇'; color: rgba(200, 195, 220, 0.55); }
+.mes_text .custom-wh-possess > p:last-child,
+.mes_text .custom-wh-release > p:last-child { margin-bottom: 0; }
+
+/* The newest one arrives with a ripple; older ones sit still. */
+.mes.last_mes .mes_text .custom-wh-possess { animation: wh-possess-in 1.6s ease-out; }
+.mes.last_mes .mes_text .custom-wh-release { animation: wh-release-in 1.2s ease-out; }
+@keyframes wh-possess-in {
+    0% { opacity: 0; filter: blur(3px) hue-rotate(-40deg); }
+    45% { opacity: 1; filter: blur(0.5px) hue-rotate(20deg); box-shadow: inset 0 0 44px rgba(170, 100, 255, 0.4), 0 0 30px rgba(210, 90, 255, 0.4); }
+    100% { filter: none; }
+}
+@keyframes wh-release-in {
+    from { opacity: 0; filter: grayscale(1) blur(2px); }
+    to { opacity: 1; filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .mes .mes_text .custom-wh-possess,
+    .mes .mes_text .custom-wh-release { animation: none; }
+}
+
+/* The other modes' moments (%%absorbed%%, %%worn%%, %%trance%% … from their Codex entries; the WH - Moments script).
+   One shape, a colour and border per mode, and a label on top. */
+.mes_text .custom-wh-moment {
+    --wh-mc: 178, 126, 255;
+    position: relative;
+    margin: 0.9em 0;
+    padding: 0.55em 1.1em 0.65em;
+    border-radius: 12px;
+    border: 1px solid rgba(var(--wh-mc), 0.5);
+    background: rgba(var(--wh-mc), 0.1);
+}
+.mes_text .custom-wh-moment::before {
+    display: block;
+    margin-bottom: 0.35em;
+    text-align: center;
+    font-size: 0.68em;
+    font-style: normal;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(var(--wh-mc), 0.9);
+}
+.mes_text .custom-wh-moment > p:last-child { margin-bottom: 0; }
+
+.mes_text .custom-wh-m-absorbed { --wh-mc: 239, 159, 39; background: linear-gradient(135deg, rgba(186, 117, 23, 0.16), rgba(239, 159, 39, 0.06)); }
+.mes_text .custom-wh-m-absorbed::before { content: '⬡ absorbed ⬡'; }
+.mes_text .custom-wh-m-worn { --wh-mc: 240, 153, 123; border: 1.5px dashed rgba(var(--wh-mc), 0.6); }
+.mes_text .custom-wh-m-worn::before { content: '❖ worn ❖'; }
+.mes_text .custom-wh-m-shed { --wh-mc: 240, 153, 123; border: 1.5px dotted rgba(var(--wh-mc), 0.4); background: rgba(var(--wh-mc), 0.05); }
+.mes_text .custom-wh-m-shed::before { content: '◇ stepped out ◇'; }
+.mes_text .custom-wh-m-trance { --wh-mc: 133, 183, 235; border: 3px double rgba(var(--wh-mc), 0.55); background: radial-gradient(ellipse at center, rgba(55, 138, 221, 0.16), rgba(55, 138, 221, 0.05)); }
+.mes_text .custom-wh-m-trance::before { content: '◎ trance ◎'; }
+.mes_text .custom-wh-m-control { --wh-mc: 212, 83, 126; border-left: 4px solid rgba(var(--wh-mc), 0.9); border-radius: 0 12px 12px 0; }
+.mes_text .custom-wh-m-control::before { content: '✦ control ✦'; }
+.mes_text .custom-wh-m-timestop { --wh-mc: 211, 209, 199; background: rgba(var(--wh-mc), 0.07); filter: grayscale(1); }
+.mes_text .custom-wh-m-timestop::before { content: '❚❚ time stops ❚❚'; }
+.mes_text .custom-wh-m-resume { --wh-mc: 211, 209, 199; border-style: dashed; background: rgba(var(--wh-mc), 0.04); }
+.mes_text .custom-wh-m-resume::before { content: '▶ time resumes ▶'; }
+
+/* The newest one arrives in its own way; older ones sit still. */
+.mes.last_mes .mes_text .custom-wh-moment { animation: wh-moment-in 1.2s ease-out; }
+.mes.last_mes .mes_text .custom-wh-m-trance { animation: wh-trance-in 2.2s ease-out; }
+.mes.last_mes .mes_text .custom-wh-m-timestop { animation: wh-timestop-in 0.9s steps(6, end); }
+@keyframes wh-moment-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes wh-trance-in {
+    0% { opacity: 0; filter: blur(2px); }
+    40% { opacity: 1; filter: blur(0.6px); box-shadow: 0 0 26px rgba(133, 183, 235, 0.35); }
+    100% { filter: none; box-shadow: none; }
+}
+@keyframes wh-timestop-in { from { opacity: 0.2; filter: grayscale(0); } to { opacity: 1; filter: grayscale(1); } }
+@media (prefers-reduced-motion: reduce) {
+    .mes .mes_text .custom-wh-moment { animation: none; }
+}

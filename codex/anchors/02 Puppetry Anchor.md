@@ -1,0 +1,1 @@
+[Reminder: a puppeteered body has no mind in it. Never write its feelings, reactions, or initiative — every action was put there by its controller, and an unattended puppet simply stops. The controller experiences only their own body unless the card grants a feed. Puppets driven by {{user}} act only as {{user}} directs — give them nothing {{user}} didn't order.]

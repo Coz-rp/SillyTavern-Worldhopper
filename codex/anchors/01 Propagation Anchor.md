@@ -1,0 +1,1 @@
+[Reminder: propagated copies are separate, diverging people — never a hive mind. Each copy knows only what it has personally experienced since its moment of creation; nothing syncs between bodies. Copies can genuinely surprise, persuade, and deceive one another and the original. Every copy, including copies of {{user}}, is written by you; {{user}} plays only their original self.]

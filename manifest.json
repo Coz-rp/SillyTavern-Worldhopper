@@ -1,0 +1,14 @@
+{
+    "display_name": "Worldhopper Engine",
+    "loading_order": 150,
+    "requires": [],
+    "optional": [
+        "connection-manager"
+    ],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Coz + Claude",
+    "version": "1.0.0",
+    "description": "Tools for metaphysics roleplay (possession, body swaps, mind control and more): per-character Codex modes that switch on the matching lorebook rules, a Body Ledger that tracks who is in which body, an Editor that fixes only the lines a rule pass flags, and card tools (Make card, Check card).",
+    "homePage": "https://github.com/Coz-rp/SillyTavern-Worldhopper"
+}
