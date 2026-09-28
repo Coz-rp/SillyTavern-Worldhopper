@@ -1071,6 +1071,28 @@ function onMessageReceived(mesId, type) {
     });
 }
 
+// An update still running when you switch chats is dropped (it can't be written into the chat you moved to), so the
+// newest reply comes back without a Ledger entry, and a chat's first reply comes back with no Ledger at all. Opening
+// the chat catches that reply up. The greeting alone is left for the first reply, as before.
+function catchUpLedger() {
+    const key = chatKey();
+    const i = lastReplyIndex();
+    const behind = () => chatKey() === key && i > 0 && !!ctx().chat?.[i] && !ctx().chat[i].extra?.wh_ledger && ledgerWanted() && !!ledgerProfile();
+    if (!behind()) return;
+    let done;
+    ledgerReady = new Promise(r => (done = r));
+    enqueue(async () => {
+        try {
+            if (!behind()) return;   // the dropped update may have landed after all, if you came straight back
+            setLedgerBusy(true);
+            await updateLedger(i);
+        } finally {
+            setLedgerBusy(false);
+            done();
+        }
+    });
+}
+
 async function onGenerationStarted(type, _options, dryRun) {
     if (!dryRun && type !== 'quiet') {
         const t0 = performance.now();
@@ -1479,6 +1501,7 @@ jQuery(async () => {
             pickerOpen = null;
             renderCodexPanel(); renderLedgerPanel(); renderEditorPanel(); applyLedgerInjection();
             setTimeout(markAll, 0);
+            catchUpLedger();
             enqueue(() => suggestModes());
         });
         // Keep the Models and Codex lorebook lists current as profiles and lorebooks come and go.
