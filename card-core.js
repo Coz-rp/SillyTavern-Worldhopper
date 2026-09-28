@@ -9,7 +9,10 @@ import { ALL_MODES } from './codex-core.js';
 
 const LABEL = /^[\s>*_`]*-{3}\s*([^-\n].*?)\s*-{3}[\s*_`]*$/;
 const SEPARATOR = /^\s*-{3,}\s*$/;
-const CONTROL = /^\s*\[[^\]\n]*(?:ready|say\s+["“]?next|what to change|your move|next up)[^\]\n]*\]\s*$/i;
+// The builder's own bracketed line after a reply's last block ("[DESCRIPTION ready — say "next"…]", and at the end
+// "[Card complete — press Make card…]"). The sign-off once leaked into the last block (Creator Notes). Bracketed lines
+// that belong to a piece (post-history rules, a Character's Note) don't use these words, so they stay.
+const CONTROL = /^\s*\[[^\]\n]*(?:ready|revised|say\s+["“]?next|what to change|your move|next up|make\s+card|wand menu|all done|card(?:\s+is)?\s+(?:complete|done|finished))[^\]\n]*\]\s*$/i;
 const TOKENS_LINE = /^\s*TOKENS:\s*\[?\s*~?\d[\d,]*\s*\]?\s*$/i;
 
 /** Which card field a label line is for; null for labels this doesn't know. */
@@ -250,12 +253,16 @@ export function doctorCard(d, { userNames = [], modes = [], tool = false, always
 }
 
 export const REVIEW_SYSTEM = `You review character cards for an adult metaphysics roleplay setup. The setup's Codex (the Worldhopper Codex) already defines each mode's general mechanics; the card should state only its own specifics, and never contradict the Codex or its rules. The Codex rules: possessed hosts are simply gone unless the card says otherwise; mind control changes the mind itself, felt as the subject's own; one mind in several bodies never converses with itself and never moves in sync (it may touch itself and talk about its other bodies freely); narration never points out who is inside a body; a possession the player hasn't been told about stays invisible; characters use their powers without asking permission.
-List up to 8 concrete problems that would hurt play: contradictions with the Codex definitions or its rules, mechanics left unclear, inconsistencies between sections, greetings that break the rules, things the model is likely to get wrong. Skip anything the Codex already settles unless the card contradicts it. For each: quote the words, say what goes wrong in play, and give the fix; every fix must itself follow the Codex rules (never one that has narration point out who is inside a body). Most serious first. If the card is fine, say so in one line. A numbered list, no preamble, no closing remarks.`;
+List up to 6 concrete problems that would hurt play: contradictions with the Codex definitions or its rules, mechanics left unclear, inconsistencies between sections, greetings that break the rules, things the model is likely to get wrong. Skip anything the Codex already settles unless the card contradicts it. For each, in two or three short sentences: quote the few words at fault, say what goes wrong in play, and give the fix; every fix must itself follow the Codex rules (never one that has narration point out who is inside a body). Most serious first. If the card is fine, say so in one line. A numbered list, no preamble, no closing remarks.`;
 
-export function buildReviewMessages(d, modes, codexText) {
+// A card builder is a tool whose long instructions are the point; judged as a roleplay character it drew nonsense
+// ("no modes picked", "the greeting is a sales pitch").
+const REVIEW_TOOL = 'This card is a card builder: a tool character that helps the author write metaphysics cards, one piece at a time. Judge it as instructions for that job (clear, consistent, and producing cards that follow the Codex), not as a roleplay character. It has no modes of its own, and its length is expected.';
+
+export function buildReviewMessages(d, modes, codexText, { tool = false } = {}) {
     const clip = (s, n) => (String(s || '').length > n ? String(s).slice(0, n) + ' …' : String(s || ''));
     const parts = [
-        `Codex modes picked for this card: ${modes.join(', ') || 'none'}.`,
+        tool ? REVIEW_TOOL : `Codex modes picked for this card: ${modes.join(', ') || 'none'}.`,
         codexText ? `The Codex's definitions of those modes:\n${clip(codexText, 6000)}` : '',
         `CARD: ${d.name}`,
         `DESCRIPTION:\n${clip(d.description, 9000)}`,

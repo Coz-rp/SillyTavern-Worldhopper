@@ -39,7 +39,8 @@
                 </div>
                 <div class="wh-help" data-help="ledger">
                     Keeps track of who is in which body (possession, swaps, skinsuits, copies, puppets…), whose mind has been changed and how (hypnosis, mind control, rewrites, drones, dolls…, with any triggers), and who has which power. It updates after each reply in chats that have a mode, and goes into the prompt so names, pronouns and every change stay straight. <span class="wh-key wh-key-you"></span> teal rows are yours; <span class="wh-key wh-key-npc"></span> violet rows are someone else's. Timestop alone gives it nothing to track, so it stays off.
-                    <br><i class="fa-solid fa-pen"></i> fixes a mistake (the next update builds on your fix) · <i class="fa-solid fa-rotate"></i> reads the chat again from scratch · tap a row to see its details.
+                    After each reply it reads only the newest messages, never the whole chat.
+                    <br><i class="fa-solid fa-pen"></i> fixes a mistake (the next update builds on your fix) · <i class="fa-solid fa-rotate"></i> rebuilds it from the card and the last few messages · tap a row to see its details.
                 </div>
                 <div id="wh_ledger_summary" class="wh-box"></div>
                 <div id="wh_ledger_history" class="wh-box wh-history"></div>
@@ -112,7 +113,7 @@
                             <label class="wh-switch" for="wh_ledger_lanes_on"><input type="checkbox" id="wh_ledger_lanes_on"><span><b>Body roster</b><small>While you run more than one body, a colour-coded card per body sits over the message box and starts a line for it.</small></span></label>
                             <label class="wh-switch" for="wh_ledger_history_on"><input type="checkbox" id="wh_ledger_history_on"><span><b>Body History</b><small>Remembers past body changes: who was inside, what the owner remembers, what was kept.</small></span></label>
                         </div>
-                        <div id="wh_ledger_backfill" class="menu_button wh-wide-button" title="For a chat that started before the Ledger was on: read every earlier reply to build the history. About 1 s per reply; click again to stop."><i class="fa-solid fa-clock-rotate-left"></i> Build history from whole chat</div>
+                        <div id="wh_ledger_backfill" class="menu_button wh-wide-button" title="For a chat that started before the Ledger was on: reads the replies that have no Ledger entry yet, once each, to build the history. On a long chat you can read just the last 30. About 1 s per reply; click again to stop."><i class="fa-solid fa-clock-rotate-left"></i> Build history from earlier replies</div>
                     </section>
 
                     <section class="wh-section">

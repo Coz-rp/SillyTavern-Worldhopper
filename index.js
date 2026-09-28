@@ -28,6 +28,8 @@ const LOG = '[Worldhopper]';
 const LEDGER_KEY = 'worldhopper_ledger';
 const HISTORY_KEY = 'worldhopper_history';
 const HISTORY_DEPTH = 4;   // background, so a little further back than the Ledger at depth 1
+const REVIEW_TIMEOUT_MS = 180000;   // Check card's deeper review: a slow model takes about a minute; past three, give up
+const RECENT_REPLIES = 30;   // "Build history" can read just this many of the latest replies instead of the whole chat
 const IN_CHAT = 1;   // extension_prompt_types.IN_CHAT
 const SYSTEM = 0;    // extension_prompt_roles.SYSTEM
 const DEFAULTS = {
@@ -77,20 +79,20 @@ function profileByName(name) {
     return ctx().extensionSettings.connectionManager?.profiles?.find(p => p.name === name);
 }
 
-/** Send messages through a connection profile (Text or Chat Completion). Returns the text, or throws. */
-async function askProfile(name, messages, maxTokens, temperature) {
+/** Send messages through a connection profile (Text or Chat Completion). Returns the text, or throws. `signal` aborts it. */
+async function askProfile(name, messages, maxTokens, temperature, { signal = null } = {}) {
     if (!name) throw new Error('no model picked (Worldhopper → Settings → Models)');
     const profile = profileByName(name);
     if (!profile) throw new Error(`connection profile “${name}” not found`);
     if (profile.mode === 'cc') {
-        const custom = { stream: false, extractData: true, includePreset: true, includeInstruct: false };
+        const custom = { stream: false, extractData: true, includePreset: true, includeInstruct: false, signal };
         const res = await ConnectionManagerRequestService.sendRequest(profile.id, messages, maxTokens, custom, { temperature });
         return typeof res === 'string' ? res : String(res?.content ?? '');
     }
     // A background request ends on the instruct's quiet sequence, which skips the reply-turn prefill (for Gemma 4
     // WH, the empty thought channel). Without it Gemma opens a thought block, hits the "<|channel>thought" stop
     // string, and returns nothing. So end on the template's normal reply opening instead.
-    const custom = { stream: false, extractData: true, includePreset: true, includeInstruct: true };
+    const custom = { stream: false, extractData: true, includePreset: true, includeInstruct: true, signal };
     const inst = profile.instruct ? getPresetManager('instruct')?.getCompletionPresetByName(profile.instruct) : null;
     if (inst?.last_output_sequence) custom.instructSettings = { last_system_sequence: inst.last_output_sequence };
     // DRY off: an RP preset often uses it, and it penalises exactly what these jobs need — copying a sentence or
@@ -482,20 +484,38 @@ async function noteEndedRides(mesId, ended, { save = true } = {}) {
     console.log(LOG, 'history notes', notes);
 }
 
-// One-time walk over an older chat: a ledger snapshot for every reply that has none, so the history covers
-// everything that happened before the Ledger existed. Click again to stop.
+// One-time walk over an older chat: a ledger snapshot for every reply that has none, so the history covers what
+// happened before the Ledger existed. Replies that already have one are skipped, and a long chat can do just its
+// latest replies. Click again to stop.
 let backfill = null;
+const BACKFILL_LABEL = '<i class="fa-solid fa-clock-rotate-left"></i> Build history from earlier replies';
+const minutes = n => `about ${Math.max(1, Math.ceil(n * 1.5 / 60))} min`;
 
 async function backfillHistory() {
     if (backfill) { backfill.stop = true; return; }
-    const chat = ctx().chat || [];
-    const todo = chat.map((m, i) => (isReply(m) && !m.extra?.wh_ledger ? i : -1)).filter(i => i >= 0);
-    if (!todo.length) { toastr.info('Every reply already has a ledger entry.'); return; }
+    const c = ctx();
+    const chat = c.chat || [];
+    const all = chat.map((m, i) => (isReply(m) && !m.extra?.wh_ledger ? i : -1)).filter(i => i >= 0);
+    if (!all.length) { toastr.info('Every reply already has a Ledger entry.'); return; }
     if (!ledgerProfile()) { toastr.warning('Pick a Ledger model first (Settings → Models).'); return; }
+    const replies = chat.map((m, i) => (isReply(m) ? i : -1)).filter(i => i >= 0);
+    const cutoff = replies[Math.max(0, replies.length - RECENT_REPLIES)];
+    const recent = all.filter(i => i >= cutoff);
+    let todo = all;
+    if (recent.length < all.length) {
+        const res = await c.callGenericPopup(
+            `<p>${all.length} replies in this chat have no Ledger entry yet. Each is read once; replies that already have one are skipped.</p>`
+            + `<p><b>Last ${RECENT_REPLIES} replies:</b> ${recent.length ? `reads ${recent.length}, ${minutes(recent.length)}.` : 'nothing to read, they all have entries.'}<br><b>Whole chat:</b> reads all ${all.length}, ${minutes(all.length)}.</p>`,
+            c.POPUP_TYPE.CONFIRM, '', { okButton: `Last ${RECENT_REPLIES} replies`, cancelButton: 'Cancel', customButtons: [{ text: 'Whole chat', result: 2 }] });
+        if (res === 2) todo = all;
+        else if (res === c.POPUP_RESULT.AFFIRMATIVE) todo = recent;
+        else return;
+        if (!todo.length) { toastr.info(`The last ${RECENT_REPLIES} replies already have Ledger entries.`); return; }
+    }
     const job = backfill = { stop: false };
     const key = chatKey();
-    $('#wh_ledger_backfill').text('Stop building');
-    toastr.info(`Building the Body History from ${todo.length} replies (about ${Math.ceil(todo.length * 1.5 / 60)} min). You can keep reading; new replies wait their turn.`);
+    $('#wh_ledger_backfill').html('<i class="fa-solid fa-stop"></i> Stop building');
+    toastr.info(`Building the Body History from ${todo.length} replies (${minutes(todo.length)}). You can keep reading; new replies wait their turn.`);
     let done = 0, endings = 0;
     await enqueue(async () => {
         try {
@@ -511,7 +531,7 @@ async function backfillHistory() {
         } finally {
             if (chatKey() === key) await ctx().saveChat();
             backfill = null;
-            $('#wh_ledger_backfill').text('Build history from whole chat');
+            $('#wh_ledger_backfill').html(BACKFILL_LABEL);
             applyLedgerInjection();
             renderLedgerPanel();
             ledgerStatus(`${job.stop ? 'Stopped' : 'Done'}: ${done} replies read, ${endings} ended body change${endings === 1 ? '' : 's'} found.`);
@@ -1335,22 +1355,38 @@ async function checkCard() {
     root.append($('<div class="wh-muted"></div>').text(`${always} tokens every reply · ${greetings} greeting${greetings === 1 ? '' : 's'} · modes: ${modes.join(', ') || 'none'}`));
     root.append(doctorList(issues));
     const btn = $('<div class="menu_button wh-card-review"><i class="fa-solid fa-magnifying-glass"></i><span>Deeper review</span></div>')
-        .attr('title', `${notesProfile() || 'The notes model'} reads the whole card against the Codex (one request)`);
+        .attr('title', `${notesProfile() || 'The notes model'} reads the whole card against the Codex (one request, usually under a minute)`);
     const out = $('<div class="wh-card-review-out"></div>');
+    // A thorough read takes a while, so the button counts the seconds, a second click cancels, and after
+    // REVIEW_TIMEOUT it gives up rather than spinning forever.
+    let running = null;
     btn.on('click', async () => {
-        if (btn.hasClass('disabled')) return;
-        btn.addClass('disabled').find('i').attr('class', 'fa-solid fa-spinner fa-spin');
-        out.text('');
+        if (running) { running.abort(); return; }
+        const job = running = new AbortController();
+        const timer = setTimeout(() => job.abort(new Error('timeout')), REVIEW_TIMEOUT_MS);
+        const t0 = Date.now();
+        const label = btn.find('span');
+        const tick = () => label.text(`Reviewing with ${notesProfile() || 'the notes model'}… ${Math.round((Date.now() - t0) / 1000)} s · tap to cancel`);
+        tick();
+        const ticker = setInterval(tick, 1000);
+        btn.addClass('wh-busy').find('i').attr('class', 'fa-solid fa-spinner fa-spin');
+        out.html('<small class="wh-muted">A thorough read usually takes under a minute.</small>');
         try {
             // A generous ceiling: on explicit cards Claude spends hidden tokens before it answers.
-            const text = await askProfile(notesProfile(), buildReviewMessages(d, modes, await codexText(modes)), 4000, 0.3);
+            const text = await askProfile(notesProfile(), buildReviewMessages(d, modes, await codexText(modes), { tool: !!d.extensions?.worldhopper?.tool }), 4000, 0.3, { signal: job.signal });
             // Escaped first, then only **bold** is turned back into markup.
             const safe = $('<div></div>').text(text.trim() || 'The model returned nothing. Try again.').html();
             out.html(safe.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'));
         } catch (err) {
-            out.text(`Couldn't run the review: ${err.message}`);
+            out.text(job.signal.aborted
+                ? (job.signal.reason?.message === 'timeout' ? `No answer after ${REVIEW_TIMEOUT_MS / 60000} minutes, so the review stopped. Check the Notes model under Settings → Models, or try again.` : 'Review cancelled.')
+                : `Couldn't run the review: ${err.message}`);
         } finally {
-            btn.removeClass('disabled').find('i').attr('class', 'fa-solid fa-magnifying-glass');
+            clearTimeout(timer);
+            clearInterval(ticker);
+            running = null;
+            label.text('Deeper review');
+            btn.removeClass('wh-busy').find('i').attr('class', 'fa-solid fa-magnifying-glass');
         }
     });
     root.append(btn, out);

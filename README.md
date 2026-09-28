@@ -124,9 +124,11 @@ The record goes into the prompt just before the model writes, so names, pronouns
 
 **"As …" badges** on your messages show whose body you wrote them from.
 
-**Body History** remembers past body changes: who was inside, what the owner remembers, what was kept or left behind. For a chat that started before the Ledger was on, **Build history from whole chat** reads every earlier reply once.
+**Body History** remembers past body changes: who was inside, what the owner remembers, what was kept or left behind. For a chat that started before the Ledger was on, **Build history from earlier replies** reads the replies that have no Ledger entry yet, once each. On a long chat it offers to read just the last 30 instead of the whole thing.
 
-**Fixing mistakes:** ✏️ opens the Ledger to edit; the next update builds on your fix. 🔄 reads the chat again from scratch.
+**It never rereads the chat.** After each reply the Ledger reads only the newest messages, alongside what it already knows.
+
+**Fixing mistakes:** ✏️ opens the Ledger to edit; the next update builds on your fix. 🔄 rebuilds it from the card and the last few messages.
 
 **Which model:** the Ledger runs after every reply, and your next reply waits for it, so give it your fastest, cheapest model: a local one, or the Flash, Haiku or mini tier. With only Timestop picked there's nothing to track, so it stays off.
 
@@ -225,7 +227,7 @@ Background jobs run through your connection profiles, separate from the model yo
 | "As …" badges | Your messages show whose body you wrote them from | On |
 | Body roster | A card per body over the message box while you run more than one | On |
 | Body History | Remembers past body changes and what they left behind | On |
-| Build history from whole chat | For older chats: reads every earlier reply once to build the history | (button) |
+| Build history from earlier replies | For older chats: reads the replies with no Ledger entry, once each (the last 30, or the whole chat) | (button) |
 
 ### Editor
 
@@ -266,7 +268,8 @@ The extension sends chat text only to the connection profiles you pick under Mod
 ## ❓ Troubleshooting
 
 - **Nothing seems to happen.** Pick the character's modes (✏️ under Modes), and make sure a model is picked for **Ledger & suggestions**.
-- **The Ledger got something wrong.** Tap ✏️ on the Body Ledger and fix it; the next update builds on your fix. 🔄 reads the chat again from scratch.
+- **The Ledger got something wrong.** Tap ✏️ on the Body Ledger and fix it; the next update builds on your fix. 🔄 rebuilds it from the card and the last few messages.
+- **Deeper review takes a while.** A thorough read usually takes under a minute on a cheap model; the button counts the seconds, a second tap cancels, and after three minutes it stops on its own.
 - **I see `%%trance%%` or other markers as text.** The display scripts are off or gone: check Extensions → Regex, or import them from [the site](https://coz-rp.github.io/).
 - **"This version of Worldhopper has a newer Codex".** Your copy of WH Metaphysics has edits of your own, so it wasn't replaced. **Update (keep mine as a copy)** installs the new one and keeps yours alongside.
 - **The Ledger stays off.** With only Timestop picked there's nothing for it to track; otherwise check that it's on and has a model.
