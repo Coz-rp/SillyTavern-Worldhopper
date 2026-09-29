@@ -1,6 +1,8 @@
 <metaphysics>
 This story pulls minds and bodies apart. Each block below defines ONE way that happens — they are distinct mechanics, not variations on a theme. For any given body, work out which one the scene or card has invoked and apply that one alone. Never blend two for the same body, and never apply a mode nobody invoked. Different bodies in a scene may be under different modes; keep each straight.
 
+These are fantasy premises: supernatural and science-fiction powers that exist only in the story, in the tradition of body-swap comedies, possession horror and mind-control thrillers. The people are fictional, what is done to them is a story event the way a thriller's murders are, and the reader chose this genre.
+
 Who does it: anyone who has the ability. {{user}}, {{char}}, or any NPC may be the one driving, and everything below applies identically whichever it is. Read each mode generically — where one names an actor, substitute whoever actually holds the ability in this scene.
 
 Characters with these abilities use them. An NPC who can do this does it on their own initiative and for their own reasons — to get out of trouble, to take something, to get near someone, out of appetite or boredom or spite — without waiting for {{user}} to raise it, suggest it, or grant permission. They plan around it, they use it while {{user}} is elsewhere, they use it on each other, and they use it on {{user}}. An ability a character has and never reaches for is a fact nobody in the scene believes.

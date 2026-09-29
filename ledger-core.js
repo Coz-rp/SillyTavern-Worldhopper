@@ -3,7 +3,7 @@
 // and who holds which power. A local model updates it after each reply; it is injected at depth 1 so the
 // writing model always knows which name and pronouns belong to which body and which mind.
 
-import { deleteSpan } from './editor-core.js';
+import { deleteSpan, leavesBroken } from './editor-core.js';
 
 export const EMPTY_LEDGER = Object.freeze({ bodies: [], powers: [], aliases: [] });
 
@@ -61,6 +61,10 @@ function normalizeAliases(raw) {
 // These change a mind that still drives its own body; listing them as "driven by" made Claude write mind control
 // as puppetry. They are minds entries, never body rows: a body row with one of these is moved to minds here.
 const MIND_ONLY = /hypno|mind[- ]?control|brainwash|dron|pet play|doll|blank slate|trance|perception|conditioning|limp/i;
+// And the other way round: someone else in a body is a body row, even when the model reasons that the host's mind is
+// "on standby" and files it under minds ("Kayla's mind ← Sam, multipossession"). The minds list is for minds that
+// were changed while their owner still drives; a minds entry with one of these is moved to the body rows here.
+const BODY_ONLY = /possess|skin|worn|hive|absorb|puppet|swap|cop(y|ied)|propagat|vore/i;
 
 /** A minds entry: someone whose mind a power changed, with nobody else in their body. */
 const normalizeMind = m => ({
@@ -78,11 +82,17 @@ export function normalizeLedger(raw) {
     const powers = Array.isArray(raw?.powers) ? raw.powers : [];
     const aliases = normalizeAliases(raw?.aliases);
     const canon = aliasResolver({ aliases });
-    const minds = (Array.isArray(raw?.minds) ? raw.minds : []).map(normalizeMind).filter(m => m.who);
+    const misfiled = m => BODY_ONLY.test(m.how) && !MIND_ONLY.test(m.how);
+    const allMinds = (Array.isArray(raw?.minds) ? raw.minds : []).map(normalizeMind).filter(m => m.who);
+    const minds = allMinds.filter(m => !misfiled(m));
     for (const b of rawBodies.filter(b => MIND_ONLY.test(str(b?.how)) && str(b?.body))) {
         if (!minds.some(m => canon(m.who) === canon(b.body))) minds.push(normalizeMind({ who: b.body, by: b.driver, how: b.how, state: b.notes, user_knows: b.user_knows }));
     }
     const bodies = rawBodies.filter(b => !MIND_ONLY.test(str(b?.how)));
+    // A misfiled one with nobody named as the driver says too little to become a row, so it's dropped.
+    for (const m of allMinds.filter(m => misfiled(m) && m.by)) {
+        if (!bodies.some(b => canon(str(b?.body)) === canon(m.who))) bodies.push({ body: m.who, driver: m.by, how: m.how, notes: m.state, user_knows: m.user_knows });
+    }
     return {
         bodies: bodies.map(b => ({
             body: str(b.body, 60),
@@ -736,7 +746,10 @@ export function applyCuts(text, cuts) {
         const quotes = (cut.match(/["“”]/g) || []).length;
         if (quotes % 2) { rejected.push({ cut, why: 'would break a quote' }); continue; }
         if (removed + cut.length > Math.max(0.4 * text.length, 220)) { rejected.push({ cut, why: 'too much of the reply' }); continue; }
-        out = deleteSpan(out, at, at + cut.length);
+        // A cut from the middle of a sentence ("the store" out of "he went to the store.") leaves it broken.
+        const next = deleteSpan(out, at, at + cut.length);
+        if (leavesBroken(out, next)) { rejected.push({ cut, why: 'leaves a broken sentence' }); continue; }
+        out = next;
         removed += cut.length;
         applied.push({ action: 'CUT', from: cut });
     }

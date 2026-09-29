@@ -418,6 +418,17 @@ export function rejectRewrite(fullText, c, t, banned = []) {
     return null;
 }
 
+// A sentence cut off before it ends ("he went to. Then he", "she grabs your."), or a full stop run into the next word.
+// A cut out of the middle of a sentence, or a rewrite the model stopped short (which then gets the original's full
+// stop), leaves exactly this. Counted after the same tidying the edits get, so " ." and "." compare alike.
+const DANGLING = /\b(the|a|an|to|of|with|into|onto|from|and|or|but|your|my|its|our|their)(\s*[—–]|[.!?,;:](?=\s|$|[*"”]))|[a-z][.!?][a-z]/gi;
+const dangling = s => (String(s).replace(/[ \t]{2,}/g, ' ').replace(/ +([,.!?;:])/g, '$1').match(DANGLING) || []).length;
+
+/** True when turning `before` into `after` leaves a sentence cut off that wasn't there before. */
+export function leavesBroken(before, after) {
+    return dangling(after) > dangling(before);
+}
+
 /** Every pattern a rewrite must not introduce: the built-in list plus the player's slop list. */
 export function bannedPatterns(personal = []) {
     return [...BANLIST.map(([, p]) => p), ...personalPatterns(personal)];
@@ -439,10 +450,14 @@ export function applyEdits(text, candidates, decisions, banned = bannedPatterns(
             if (tail && t && !/[.,!?…—–-]$/.test(t)) t += tail;
             const why = rejectRewrite(text, c, t, banned);
             if (why) { rejected.push({ from: c.text, to: t, why }); continue; }
-            out = out.slice(0, c.start) + t + out.slice(c.end);
+            const next = out.slice(0, c.start) + t + out.slice(c.end);
+            if (leavesBroken(out, next)) { rejected.push({ from: c.text, to: t, why: 'leaves a broken sentence' }); continue; }
+            out = next;
             applied.push({ action: 'REWRITE', from: c.text, to: t, reasons: c.reasons });
         } else if (d.action === 'DELETE') {
-            out = deleteSpan(out, c.start, c.end);
+            const next = deleteSpan(out, c.start, c.end);
+            if (leavesBroken(out, next)) { rejected.push({ from: c.text, why: 'leaves a broken sentence' }); continue; }
+            out = next;
             applied.push({ action: 'DELETE', from: c.text, reasons: c.reasons });
         }
     }

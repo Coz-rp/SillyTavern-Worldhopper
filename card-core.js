@@ -162,6 +162,10 @@ const OCCUPANCY = ['Possession', 'Multipossession', 'Skinsuit', 'Hive Mind', 'Re
 // One mind in several bodies. Propagation copies are separate people who may argue, so they don't belong here.
 const MULTI = ['Multipossession', 'Hive Mind'];
 const NEGATED = /\b(don'?t|doesn'?t|didn'?t|never|not|no|won'?t|can'?t|isn'?t|aren'?t|without)\b[^.!?\n]*$/i;
+// Wording a model can read as young, and the ways a card states an age.
+// ("tiny" and a plain "uniform" were dropped: on real cards they were tattoos, smiles and waiters.)
+const YOUTH_CUES = /\b(high[- ]?school(ers?)?|school[- ]?(girls?|boys?|uniforms?)|schools?|campus|college|universit(y|ies)|dorm(itory|itories|s)?|students?|classmates?|freshm[ae]n|sophomores?|teens?|teenage(rs?)?|petite|childlike)\b/i;
+const AGE_STATED = /\b(1[89]|[2-9]\d)[- ]?(years?[- ]old|y\.?o\b|yrs?\b)|\bage[ds]?\b[^.\n]{0,12}\b(1[89]|[2-9]\d)\b|\((1[89]|[2-9]\d)\)|,\s*(1[89]|[2-9]\d)\s*[,.;)]|—\s*(1[89]|[2-9]\d)\s*([,.;)]|-?years?\b)|\b(eighteen|nineteen|(twenty|thirty|forty|fifty)(-\w+)?)[- ](plus|years?[- ]olds?)\b|\b(early|mid|late)?[- ]?(twenties|thirties|forties|fifties|[2-5]0s)\b|\badults?\b|\b18\+/i;
 
 /** The words around a match, cut at word edges. */
 function snippet(text, at, len) {
@@ -242,6 +246,13 @@ export function doctorCard(d, { userNames = [], modes = [], tool = false, always
     const pointer = findHit(/(borrowed (body|face|mouth|hands?|eyes)|someone else'?s (eyes|smile|voice|mouth)|(his|her|their) smile on (her|his|their) (face|mouth)|something behind (her|his|their) eyes|a smile that isn'?t (hers|his|theirs))/i, scene);
     if (pointer) {
         warn('Possession pointers in the greetings', 'The opening narration points out who is inside ("borrowed body", "his smile on her face"). The model copies the first message\'s style, so it will keep doing it. Write the habits as the body\'s own behaviour.', pointer);
+    }
+    // School and small-body wording with no age anywhere leaves a model unsure everyone is an adult, which is where it
+    // starts hedging or refusing. An age in the card or its lorebook settles it.
+    const youthful = !tool && findHit(YOUTH_CUES, all);
+    const book = (d.character_book?.entries || []).map(e => e.content).join('\n');
+    if (youthful && !AGE_STATED.test(`${all}\n${book}`)) {
+        warn('No ages stated', 'The card has wording a model can read as young (school, campus, a uniform, petite and the like) but never says how old anyone is. Models hedge or refuse when they can\'t tell everyone is an adult. Give each character an age, like "22" or "a 24-year-old".', youthful);
     }
     if (/\w+\(\s*"[^"]+"\s*(\+\s*"[^"]+"\s*)+\)|\[\s*\w+\s*:\s*[^\]]*;\s*\w+\s*:/.test(d.description || '')) {
         info('W++ / bracket format', 'Modern models do better with plain prose descriptions.');
