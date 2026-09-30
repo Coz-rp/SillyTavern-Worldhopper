@@ -10,7 +10,7 @@ It keeps the rules, the bodies and the prose straight, so the model stops gettin
 <img src="docs/images/chat-minds.png" width="400" alt="Changed minds in the strip above the chat, with a trance box and a control box in the replies">
 </p>
 
-It pairs with the [Worldhopper presets](https://coz-rp.github.io/) for Claude and Gemini, and works with any other preset, Chat Completion or Text Completion.
+It pairs with the [Worldhopper presets](https://coz-rp.github.io/) for Claude, Gemini and DeepSeek, and works with any other preset, Chat Completion or Text Completion.
 
 > 🧩 **Only what you're into.** Every mode is opt-in and picked per character, and nothing is on until you pick it. If mind control is your thing, pick Mind Control and that's all you'll ever get: no possession rules, no body swaps, no boxes or cards for modes you didn't choose. Mix as many or as few as you like, and change them any time.
 
