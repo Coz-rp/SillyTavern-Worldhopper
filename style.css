@@ -277,6 +277,10 @@
 }
 .worldhopper-settings .wh-switch input[type='checkbox']:checked::before { transform: translateX(7px); }
 .worldhopper-settings .wh-switch input[type='checkbox']:focus-visible { outline: 2px solid var(--wh-accent); outline-offset: 2px; }
+/* The on/off switch in the Worldhopper Engine heading, just left of the drawer arrow. */
+.worldhopper-settings .wh-switch.wh-power { margin: 0 10px 0 auto; padding: 0; align-items: center; }
+.worldhopper-settings .wh-switch.wh-power:hover { background: none; }
+.worldhopper-settings .wh-off-note { margin-top: 4px; }
 @media (prefers-reduced-motion: reduce) {
     .worldhopper-settings .wh-switch input[type='checkbox'],
     .worldhopper-settings .wh-switch input[type='checkbox']::before { transition: none; }
@@ -437,6 +441,10 @@
 .wh-ledger-strip .wh-chip.wh-hidden { border-style: dashed; }
 .wh-ledger-strip .wh-chip.wh-hidden .wh-chip-text { font-style: italic; }
 .wh-ledger-strip .wh-busy { opacity: 0.55; font-style: italic; font-size: 0.8em; }
+/* The Mind Book's bar sits right under the Ledger's, with a brain to tell them apart. */
+.wh-ledger-strip.wh-mind-strip { margin-top: 0; }
+#wh_ledger_strip:not([style*="display: none"]) + .wh-mind-strip { margin-top: -1px; }
+.wh-ledger-strip .wh-strip-label { flex-shrink: 0; width: 22px; text-align: center; font-size: 15px; opacity: 0.6; }
 
 /* "as (name)" next to your name when you're in someone else's body. */
 .mes .wh-as {

@@ -3,7 +3,7 @@
 // and who holds which power. A local model updates it after each reply; it is injected at depth 1 so the
 // writing model always knows which name and pronouns belong to which body and which mind.
 
-import { deleteSpan, leavesBroken } from './editor-core.js';
+import { deleteSpan, leavesBroken } from './text-core.js';
 
 export const EMPTY_LEDGER = Object.freeze({ bodies: [], powers: [], aliases: [] });
 
@@ -58,40 +58,24 @@ function normalizeAliases(raw) {
     return [...groups.values()].filter(g => g.aka.length).map(g => ({ name: g.name, aka: g.aka.slice(0, 8) })).slice(0, 24);
 }
 
-// These change a mind that still drives its own body; listing them as "driven by" made Claude write mind control
-// as puppetry. They are minds entries, never body rows: a body row with one of these is moved to minds here.
+// The Ledger tracks who is in which body, and nothing else. Mind changes (hypnosis, mind control, drones, dolls…) are
+// left to the Codex: on local models the minds list mostly added confusion. A body row with one of these is dropped.
 const MIND_ONLY = /hypno|mind[- ]?control|brainwash|dron|pet play|doll|blank slate|trance|perception|conditioning|limp/i;
-// And the other way round: someone else in a body is a body row, even when the model reasons that the host's mind is
-// "on standby" and files it under minds ("Kayla's mind ← Sam, multipossession"). The minds list is for minds that
-// were changed while their owner still drives; a minds entry with one of these is moved to the body rows here.
+// Older ledgers had a minds list, and models still sometimes file a possession there because the host's mind is "on
+// standby" ("Kayla's mind ← Sam, multipossession"). An entry with one of these is really a body row and becomes one.
 const BODY_ONLY = /possess|skin|worn|hive|absorb|puppet|swap|cop(y|ied)|propagat|vore/i;
-
-/** A minds entry: someone whose mind a power changed, with nobody else in their body. */
-const normalizeMind = m => ({
-    who: str(m?.who, 60),
-    by: /^(none|nobody|no one|n\/a|null|-|self)$/i.test(str(m?.by)) ? '' : str(m?.by, 60),
-    how: fit(m?.how, 40),
-    changes: fit(m?.changes, 220),
-    triggers: fit(m?.triggers, 160),
-    state: fit(m?.state, 100),
-    user_knows: /^\s*n/i.test(String(m?.user_knows ?? '')) ? 'no' : 'yes',
-});
 
 export function normalizeLedger(raw) {
     const rawBodies = Array.isArray(raw?.bodies) ? raw.bodies : [];
     const powers = Array.isArray(raw?.powers) ? raw.powers : [];
     const aliases = normalizeAliases(raw?.aliases);
     const canon = aliasResolver({ aliases });
-    const misfiled = m => BODY_ONLY.test(m.how) && !MIND_ONLY.test(m.how);
-    const allMinds = (Array.isArray(raw?.minds) ? raw.minds : []).map(normalizeMind).filter(m => m.who);
-    const minds = allMinds.filter(m => !misfiled(m));
-    for (const b of rawBodies.filter(b => MIND_ONLY.test(str(b?.how)) && str(b?.body))) {
-        if (!minds.some(m => canon(m.who) === canon(b.body))) minds.push(normalizeMind({ who: b.body, by: b.driver, how: b.how, state: b.notes, user_knows: b.user_knows }));
-    }
     const bodies = rawBodies.filter(b => !MIND_ONLY.test(str(b?.how)));
     // A misfiled one with nobody named as the driver says too little to become a row, so it's dropped.
-    for (const m of allMinds.filter(m => misfiled(m) && m.by)) {
-        if (!bodies.some(b => canon(str(b?.body)) === canon(m.who))) bodies.push({ body: m.who, driver: m.by, how: m.how, notes: m.state, user_knows: m.user_knows });
+    for (const m of Array.isArray(raw?.minds) ? raw.minds : []) {
+        const how = str(m?.how), who = str(m?.who, 60), by = str(m?.by, 60);
+        if (!who || !by || /^(none|nobody|no one|n\/a|null|-|self)$/i.test(by) || !BODY_ONLY.test(how) || MIND_ONLY.test(how)) continue;
+        if (!bodies.some(b => canon(str(b?.body)) === canon(who))) bodies.push({ body: who, driver: by, how, notes: m.state, user_knows: m.user_knows });
     }
     return {
         bodies: bodies.map(b => ({
@@ -110,13 +94,12 @@ export function normalizeLedger(raw) {
         // The own body of a mind running others alongside it: off the body list, so its whereabouts live here.
         own: (Array.isArray(raw?.own) ? raw.own : []).map(o => ({ who: str(o?.who, 60), doing: fit(o?.doing, 80), notes: fit(o?.notes, 160) }))
             .filter(o => o.who && (o.doing || o.notes)).slice(0, 8),
-        minds: minds.slice(0, 24),
         powers: powers.map(p => ({ who: str(p.who, 60), power: fit(p.power, 240, 100) })).filter(p => p.who && p.power).slice(0, 24),
         aliases,
     };
 }
 
-export const isEmptyLedger = l => !l || (!l.bodies?.length && !l.powers?.length && !l.minds?.length);
+export const isEmptyLedger = l => !l || (!l.bodies?.length && !l.powers?.length);
 
 // Copies (Propagation) are separate people the writer plays, never one mind in several bodies or the player's to
 // direct. Puppets are empty bodies moved from outside: the player's to direct, but not "one person in several places".
@@ -130,13 +113,10 @@ export function akaOf(ledger, name) {
     return [...new Set(names)].filter(n => lc(n) !== lc(name));
 }
 
-const LEDGER_CORE = `You maintain the Body Ledger for an adult roleplay in which minds and bodies come apart (possession, skinsuits, hive minds, copies, puppets, swaps) and minds get changed (hypnosis, mind control, rewrites, drones, dolls). The ledger lists:
+const LEDGER_CORE = `You maintain the Body Ledger for an adult roleplay in which minds leave their own bodies and inhabit others (possession, multipossession, skinsuits, hive minds, copies, swaps). The ledger lists:
 - bodies: every body that is NOT currently driven by its own mind, every empty or vacated body, every body worn as a skin, and every mind that is outside its own body;
-- minds: everyone whose mind a power has changed while they stay in their own body;
 - every character shown or stated to hold such a power, and what the power is.
-A body driven by its own mind again leaves the body list. People who are simply themselves in their own bodies are never listed.
-
-Bodies versus minds: hypnosis, mind control, brainwashing, perception rewrites, blank slates, drones, pets, dolls and limp bodies change what is in a mind (or empty it), but nobody else is driving the body, so they are never body rows; they go under minds. Possession and the other body mechanics are never minds entries.
+A body driven by its own mind again leaves the body list. People who are simply themselves in their own bodies are never listed, and neither is anyone whose mind was changed (hypnosis, mind control and the like) while they still drive their own body: this ledger is only about who is in which body.
 
 Evidence. Add or change a row only when the messages plainly show a mind entering, leaving or switching bodies, or say so outright. Being near someone with powers, or touched, grabbed, spoken to, looked at, wanted or mentioned by them, is NOT being possessed. A character who acts on their own, speaks for themselves or shows their own feelings is in their own body. When in doubt, leave the ledger as it is.
 
@@ -145,7 +125,7 @@ Fields for each body:
 - pronouns: the BODY's own pronouns, e.g. "she/her"
 - driver: the name of the mind currently driving it, or "" if nobody is driving it (an empty body)
 - driver_pronouns: the DRIVING MIND's own pronouns, e.g. "he/him"
-- how: the mechanism in a word or two: possession, multipossession, skinsuit, hive mind, copy, puppetry, swap. A body overwritten by a copy has the original's name as driver and how "copy"
+- how: the mechanism in a word or two: possession, multipossession, skinsuit, hive mind, copy, swap. A body overwritten by a copy has the original's name as driver and how "copy"
 - host: only what the messages actually show about the body's own mind, e.g. "gone" or "dead". If they don't show it, leave it "". Never guess, and never assume the host is awake or aware.
 - notes: a short phrase: what the body is wearing and where it is. Lasting facts only, never a momentary action ("holding a cup", "laughing")
 - doing: what the body is busy with right now, an ongoing activity in a few words ("calc homework", "driving to work", "asleep"), or "" if nothing in particular. Keep it current: when the messages show the body moving on to something else, change it
@@ -153,22 +133,12 @@ Fields for each body:
 
 Aliases: anyone the story calls by more than one name (a code name or unit number, a handle, a host number, a nickname, a real name behind a persona) is listed once with every name, e.g. {"name":"Sasha","aka":["Unit 114"]}. In body and driver fields, use the name the story uses most.
 
-Own bodies: a mind that runs other bodies while still in its own (multipossession, a hive's original mind, a puppeteer) gets one "own" entry for that own body, {"who": the mind's name, "doing": as above, "notes": what it is wearing and where it is}, kept current the same way whenever that body moves or does something new. Nobody else gets one.
-
-Fields for each mind:
-- who: the person whose mind was changed
-- by: who did it, or "" if nobody is behind it now
-- how: the mechanism in a word or two: hypnosis, mind control, perception rewrite, blank slate, dronification, pet play, dollification, limp
-- changes: what has been changed, as lasting facts: new beliefs, loyalties, rules, a new sense of self, what they can no longer perceive. Never a passing command that is already done
-- triggers: any cue and what it does ("'bloom' drops her into trance"), or ""
-- state: how they are right now, in a few words ("deep trance", "awake, conditioned", "posed on the bed"). Keep it current
-- user_knows: as for bodies
-A person leaves minds when the change is undone.
+Own bodies: a mind that runs other bodies while still in its own (multipossession, a hive's original mind) gets one "own" entry for that own body, {"who": the mind's name, "doing": as above, "notes": what it is wearing and where it is}, kept current the same way whenever that body moves or does something new. Nobody else gets one.
 
 Rules:
 - Change only what the new messages clearly establish.
 - A mind drives one body at a time unless the story shows it running several at once. When a driver moves into a new body, the body they left is no longer theirs: it is empty (driver "") or back with its own mind (remove it), whichever the messages show.
-- A scene jump does not end an arrangement by itself. But when the newest messages show a driver living as themselves in their own body (their own home, their own name and features), remove the rows where they were driving.
+- A row stays until the messages show it ending: the driver leaving the body, being forced out or letting it go, or the body's own mind back in control. A scene that moves somewhere else, a body nobody mentions for a while, or the driver busy in another body ends nothing.
 - Use each character's name as the story does. The player's character is called {{user}}.
 - Pronouns come from the story or the card. If a body's sex is plain from the text (breasts, cock, "the girl"), use it.`;
 
@@ -176,17 +146,16 @@ Rules:
 export const LEDGER_SYSTEM = `${LEDGER_CORE}
 - Copy everything that didn't change exactly as it was.
 Answer with the complete ledger as JSON and nothing else, in exactly this shape:
-{"bodies":[{"body":"","pronouns":"","driver":"","driver_pronouns":"","how":"","host":"","notes":"","doing":"","user_knows":"yes"}],"own":[{"who":"","doing":"","notes":""}],"minds":[{"who":"","by":"","how":"","changes":"","triggers":"","state":"","user_knows":"yes"}],"powers":[{"who":"","power":""}],"aliases":[{"name":"","aka":[""]}]}`;
+{"bodies":[{"body":"","pronouns":"","driver":"","driver_pronouns":"","how":"","host":"","notes":"","doing":"","user_knows":"yes"}],"own":[{"who":"","doing":"","notes":""}],"powers":[{"who":"","power":""}],"aliases":[{"name":"","aka":[""]}]}`;
 
 // Every later update: only the changes. Rewriting a dozen-body ledger every reply took a 26B local model 7.5 s; most replies
 // change nothing or one row, which is well under a second of output.
 export const LEDGER_UPDATE_SYSTEM = `${LEDGER_CORE}
 Answer with ONLY what changed, as JSON and nothing else, in this shape, leaving out any part with nothing in it:
-{"set":[{"body":"","pronouns":"","driver":"","driver_pronouns":"","how":"","host":"","notes":"","doing":"","user_knows":"yes"}],"remove":["body name"],"own":{"set":[{"who":"","doing":"","notes":""}],"remove":["who"]},"minds":{"set":[{"who":"","by":"","how":"","changes":"","triggers":"","state":"","user_knows":"yes"}],"remove":["who"]},"powers":{"set":[{"who":"","power":""}],"remove":["who"]},"aliases":[{"name":"","aka":[""]}]}
+{"set":[{"body":"","pronouns":"","driver":"","driver_pronouns":"","how":"","host":"","notes":"","doing":"","user_knows":"yes"}],"remove":["body name"],"own":{"set":[{"who":"","doing":"","notes":""}],"remove":["who"]},"powers":{"set":[{"who":"","power":""}],"remove":["who"]},"aliases":[{"name":"","aka":[""]}]}
 - set: each body that is new or whose row changed, with all its fields.
-- remove: each body that leaves the ledger (its own mind drives it again), by name; for a mind with no body, the mind's name.
+- remove: each body whose driver the new messages show leaving (its own mind drives it again), by name; for a mind with no body, the mind's name.
 - own: own-body entries that are new or changed (a new place or a new activity counts); remove one when that mind no longer runs other bodies.
-- minds: minds entries that are new or changed (a new change, trigger or state counts), with all their fields; remove one when the change is undone.
 - aliases: only new names.
 If nothing changed, answer {}`;
 
@@ -211,7 +180,10 @@ export function buildLedgerMessages({ ledger, messages, userName, modes = [], ca
     if (persona) parts.push(`${userName}'s persona:\n${clip(persona, 800)}`);
     if (modes.length) parts.push(`Mechanics this story can use (possible, not necessarily happening): ${modes.join(', ')}.`);
     const keepsOwn = modes.filter(m => KEEPS_OWN_BODY.includes(m));
-    if (keepsOwn.length) parts.push(`With ${list(keepsOwn)}, one mind runs several bodies at once, and taking a new body adds it: the mind keeps every body it already had, its own included, unless the messages show it leaving one. Its own body stays off the body list while it still drives it (it gets an "own" entry instead); never list it as empty just because the mind took someone else. Such a ride's how is ${keepsOwn.map(m => `"${lc(m)}"`).join(' or ')}, whichever the story shows.`);
+    if (keepsOwn.length) parts.push(`With ${list(keepsOwn)}, one mind runs several bodies at once, and taking a new body adds it: the mind keeps every body it already had, its own included, unless the messages show it leaving one. Its own body stays off the body list while it still drives it (it gets an "own" entry instead); never list it as empty just because the mind took someone else, and never take a row off because the scene is following its own body or another of its bodies. Such a ride's how is ${keepsOwn.map(m => `"${lc(m)}"`).join(' or ')}, whichever the story shows.`);
+    // Only in a one-body story does a driver seen as themselves mean they left. (In a multipossession chat, the
+    // possessor cooking dinner in his own body took the other bodies off the ledger.)
+    else if (isSingleBody(modes)) parts.push('In this story a mind drives one body at a time, so a driver shown living as themselves in their own body (their own home, their own name and features) has left the body they were in: remove that row.');
     parts.push(`Current ledger:\n${JSON.stringify(normalizeLedger(ledger || EMPTY_LEDGER))}`);
     if (context.length) parts.push('Earlier messages, for context only (the ledger already reflects them):\n' + context.map(m => `### ${m.name}\n${clip(m.text, 1500)}`).join('\n\n'));
     parts.push((context.length ? 'New messages to apply' : 'Newest messages') + ', oldest first:\n' + messages.map(m => `### ${m.name}\n${clip(m.text, 2500)}`).join('\n\n'));
@@ -307,21 +279,9 @@ export function applyLedgerDiff(ledger, diff) {
         if (i < 0) own.push({ who: x.who, ...given }); else own[i] = { ...own[i], ...given };
     }
 
+    // A minds entry in the answer is only kept when it's really a body row filed in the wrong place (normalizeLedger).
     const d = diff.minds;
-    const dSet = Array.isArray(d) ? d : listOf(d?.set ?? d?.add);
-    const dGone = new Set(listOf(Array.isArray(d) ? [] : d?.remove).map(n => canon(nameOf(n))));
-    const minds = base.minds.filter(x => !dGone.has(canon(x.who)));
-    for (const x of dSet) {
-        if (!x?.who) continue;
-        const i = minds.findIndex(y => canon(y.who) === canon(x.who));
-        if (i < 0) { minds.push(x); continue; }
-        const merged = { ...minds[i] };
-        for (const f of ['by', 'how', 'changes', 'triggers', 'state', 'user_knows']) {
-            if (x[f] == null || (f === 'user_knows' && minds[i].user_knows === 'yes')) continue;
-            merged[f] = x[f];
-        }
-        minds[i] = merged;
-    }
+    const minds = Array.isArray(d) ? d : listOf(d?.set ?? d?.add);
     return normalizeLedger({ bodies, own, minds, powers, aliases });
 }
 
@@ -463,6 +423,95 @@ export function dropRides(prev, next, rejected) {
     const bodies = normalizeLedger(next).bodies.flatMap(b => (!wrong.has(bodyKey(b)) ? [b] : before.has(bodyKey(b)) ? [before.get(bodyKey(b))] : []));
     return normalizeLedger({ ...next, bodies });
 }
+
+// ------------------------------------------------------------------ second look at ended possessions
+// The other way round: the update model takes rows off when the scene moves on, a body goes unmentioned for a while,
+// or (with several bodies) the possessor is busy in their own body. A row only leaves when the messages show it
+// ending, so each one that leaves gets a look. If the new messages never name the body or its driver it is simply
+// kept; otherwise a yes/no question decides.
+
+export const END_CHECK_SYSTEM = `You check one claim about a roleplay: that a particular mind has stopped driving a particular person's body.
+Answer YES only if the new messages show it ending: the mind leaving the body, being forced out or letting it go, or the person's own mind back in control. A passage marked as a release (between %%release%% lines) or as stepping out of a skin (%%shed%%) is exactly that.
+Answer NO if the messages simply follow someone else, move to another place, leave the person out, or show the mind busy in another body, its own included. When it's unclear, answer NO.
+Answer YES or NO on the first line, then quote the words that decide it.`;
+
+export function buildEndCheckMessages(ride, messages, context = [], userName = 'the player', { modes = [] } = {}) {
+    const show = xs => xs.map(m => `### ${m.name}\n${clip(m.text, 2500)}`).join('\n\n');
+    const known = [
+        modes.length ? `Mechanics this story can use: ${modes.join(', ')}.` : '',
+        `The player's character is ${userName}; "you" in the narration is ${userName}, or whoever is driving ${userName}'s body.`,
+    ].filter(Boolean).join('\n');
+    return [
+        { role: 'system', content: END_CHECK_SYSTEM },
+        { role: 'user', content: `${context.length ? `Earlier messages:\n${show(context)}\n\n` : ''}New messages:\n${show(messages)}\n\n${known}\nClaim: ${ride.driver}'s mind is no longer driving ${ride.body}'s body.\nIs the claim shown? YES or NO.` },
+    ];
+}
+
+/** Whether the text names someone: their name, a proper first name, an alias, or "you" for the player. */
+function names(text, who, ledger, userName) {
+    const canon = aliasResolver(ledger);
+    const keys = [who, ...akaOf(ledger, who)].flatMap(n => {
+        const s = str(n), first = s.split(' ')[0];
+        return /^[A-Z]/.test(first) && first.length > 2 && !/^(The|His|Her|Their|Its)$/.test(first) ? [s, first] : [s];
+    });
+    if (userName && canon(who) === canon(userName)) keys.push('you', 'your');
+    return keys.some(k => k && new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text));
+}
+
+/**
+ * Second look at every possession that left the ledger; `ask(messages, maxTokens)` as for verifyNewRides. A ride the
+ * new messages never touch is put back without asking; otherwise a NO puts it back. In a one-body story, a mind that
+ * just took a new body has left the old one, which the where-check already settled, so that isn't asked again.
+ */
+export async function verifyEndedRides(prev, next, { messages, context = [], userName = 'the player', modes = [] }, ask) {
+    const canon = aliasResolver(prev, next);
+    const text = messages.map(m => m.text).join('\n');
+    const moved = new Set(isSingleBody(modes) ? newRides(prev, next).map(r => canon(r.driver)) : []);
+    const kept = [], log = [];
+    // The writer marks the moment a possessor lets a body go (%%release%%, or %%shed%% for a skin; on Chub a
+    // blockquote under the same title): one that names the body settles it without asking.
+    const releases = [
+        ...[...text.matchAll(/%%(release|shed)%%([\s\S]*?)(?:%%\/\1%%|$)/gi)].map(m => m[2]),
+        ...[...text.matchAll(/^> \*\*◇ (?:release|stepped out) ◇\*\*[ \t]*\n((?:>.*(?:\n|$))*)/gim)].map(m => m[1]),
+    ];
+    for (const ride of endedRides(prev, next)) {
+        if (moved.has(canon(ride.driver))) continue;
+        let ended = false, answer = 'neither the body nor its driver is in the new messages';
+        if (releases.some(r => names(r, ride.body, prev, userName))) { ended = true; answer = 'a marked release names the body'; }
+        else if (names(text, ride.body, prev, userName) || names(text, ride.driver, prev, userName)) {
+            answer = await ask(buildEndCheckMessages(ride, messages, context, userName, { modes }), 120);
+            ended = parseRideCheck(answer);
+        }
+        log.push({ ride: `${ride.driver} → ${ride.body}`, ended, answer: String(answer).replace(/\s+/g, ' ').slice(0, 160) });
+        if (!ended) kept.push(ride);
+    }
+    // And the other way: a marked release that names exactly one body still being ridden ends that ride, even when
+    // the update kept it. (With two ridden bodies named, the passage could be about either, so it's left alone; and a
+    // bare "you" doesn't count here, since second-person narration says it in every passage.)
+    let out = keepRides(prev, next, kept);
+    for (const r of releases.filter(r => r.trim())) {
+        const named = rides(out).filter(b => names(r, b.body, out, null));
+        if (named.length !== 1) continue;
+        out = normalizeLedger({ ...out, bodies: out.bodies.filter(b => canon(b.body) !== canon(named[0].body)) });
+        log.push({ ride: `${named[0].driver} → ${named[0].body}`, ended: true, answer: 'a marked release names only this body' });
+    }
+    return { ledger: out, kept, log };
+}
+
+/** Put back the rows for rides that didn't really end, as the previous ledger had them. */
+export function keepRides(prev, next, kept) {
+    if (!kept.length) return normalizeLedger(next);
+    const canon = aliasResolver(prev, next);
+    const back = new Set(kept.map(r => canon(r.body)));
+    const before = normalizeLedger(prev).bodies.filter(b => back.has(canon(b.body)));
+    const n = normalizeLedger(next);
+    return normalizeLedger({ ...n, bodies: [...n.bodies.filter(b => !back.has(canon(b.body))), ...before] });
+}
+
+// Modes the Ledger runs for: the ones where a mind inhabits a body that isn't its own. (Mind changes are left to the
+// Codex; Puppetry steers a body from outside.) Copy Fidelity and Reverse Vore bring in a mode on this list.
+export const LEDGER_MODES = ['Possession', 'Multipossession', 'Skinsuit', 'Hive Mind', 'Reverse Vore', 'Propagation', 'Copy Fidelity'];
+export const tracksBodies = (modes = []) => modes.some(m => LEDGER_MODES.includes(m));
 
 const same = (a, b) => a.toLowerCase() === b.toLowerCase();
 
@@ -613,7 +662,6 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' 
         const her = (b.pronouns.split('/')[0] || 'they').toLowerCase();
         rules.push(`${userName} doesn't know that ${b.body} is ${b.driver}. In narration ${her === 'they' ? 'they are' : `${her} is`} only ${b.body}, with ${b.body}'s own name and pronouns, and nothing mentions, hints at, or explains that anyone else is inside. ${b.driver}'s habits may show in what ${b.body} does, written as ${b.body}'s own behaviour; only what ${userName} could actually notice reaches the page.`);
     }
-    const minds = l.minds.map(m => mindLine(m, userName, players, rules));
     const powers = l.powers.map(p => `${p.who}: ${p.power}`).join('; ');
     const aliases = l.aliases.map(a => `${a.name} = ${a.aka.join(' = ')}`).join('; ');
     const hasBodies = l.bodies.length > 0 || lines.length > 0;
@@ -624,33 +672,12 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' 
             ...lines,
             `Everyone else, ${userName} included unless listed, is in their own body.`,
         ] : []),
-        ...(minds.length ? ['Whose mind a power has changed. Nobody else is in these bodies: each change is to the mind itself, never someone steering from outside.', ...minds] : []),
         ...(aliases ? [`Same person, different names: ${aliases}.`] : []),
         ...(powers ? [`Powers: ${powers}.`] : []),
         ...rules,
         'This is a record kept alongside the story. Where the chat itself says otherwise, the chat wins.',
         '</body_ledger>',
     ].join('\n');
-}
-
-// Changes felt as the subject's own: they still want, decide and explain for themselves.
-const FEELS_OWN = /hypno|trance|mind[- ]?control|perception|rewrite|brainwash|condition/i;
-
-/** One minds line for the writer; any rule it needs (hidden, who holds it) goes into `rules`. */
-function mindLine(m, userName, players, rules) {
-    const how = m.how || 'changed';
-    let line = `- ${m.who}: ${how}${m.by ? `, by ${m.by}` : ''}`;
-    if (m.changes) line += `. Changed: ${m.changes}`;
-    if (m.triggers) line += `. Triggers: ${m.triggers}`;
-    if (m.state) line += `. Right now: ${m.state}`;
-    if (FEELS_OWN.test(how)) line += `. ${m.who} is still ${m.who} at the wheel and feels all of it as their own`;
-    if (m.user_knows === 'no') {
-        line += `. HIDDEN from ${userName}`;
-        rules.push(`${userName} doesn't know anything was done to ${m.who}. Narration never mentions, hints at, or explains it; only what ${userName} could actually notice reaches the page.`);
-    }
-    if (players(m.by)) rules.push(`${m.who}'s ${how} is ${userName}'s doing: only ${userName} sets or changes what ${m.who} is made to do, think or believe.`);
-    if (players(m.who)) rules.push(`${userName} is the one changed (${how}): write ${userName}'s changed behaviour, and leave ${userName}'s inner experience of it to ${userName}.`);
-    return `${line}.`.replace(/\.\.$/, '.');
 }
 
 // ------------------------------------------------------------------ possession lint (cut-only)

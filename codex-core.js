@@ -4,7 +4,7 @@
 
 export const MODE_GROUPS = [
     ['Occupancy', ['Possession', 'Multipossession', 'Propagation', 'Copy Fidelity', 'Puppetry', 'Skinsuit', 'Hive Mind', 'Reverse Vore']],
-    ['Overwrite', ['Hypnosis', 'Mind Control', 'Perception Rewrite', 'Blank Slate', 'Dronification', 'Pet Play']],
+    ['Overwrite', ['Hypnosis', 'Mind Control', 'Altered Perception', 'Blank Slate', 'Dronification', 'Pet Play']],
     ['Reduction', ['Dollification', 'Limp Play']],
     ['Other', ['Soul Play', 'Timestop', 'Segmentation']],
 ];
@@ -34,9 +34,9 @@ export const MODE_BLURBS = {
     'Skinsuit': "a host's hollow skin is worn from within like a garment",
     'Hive Mind': 'minds absorbed into a single network that is the original mind',
     'Reverse Vore': 'entry by being swallowed, then control seized from inside',
-    'Hypnosis': 'suggestions implanted and sincerely rationalised as the subject\'s own',
+    'Hypnosis': 'realistic trances that deepen in stages over sessions, with suggestions sincerely rationalised as the subject\'s own',
     'Mind Control': "the mind itself taken over: wants, feelings and beliefs set by the controller and felt as the subject's own",
-    'Perception Rewrite': 'premises edited so the altered normal is defended as always true',
+    'Altered Perception': 'premises edited so the altered normal is defended as always true',
     'Blank Slate': 'a mind wiped to a genuine void',
     'Dronification': 'personality stripped and replaced with function and designations',
     'Pet Play': "the mind becomes an animal's while the body stays human",

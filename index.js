@@ -6,22 +6,26 @@
 //           per message/swipe, and injected at depth 1 so the writer keeps names and pronouns straight.
 //           Body History: past body changes, derived from those snapshots, plus a short note per ended one (what
 //           the owner remembers, what was kept, what it left behind), injected at depth 4.
-//   Editor: after a reply arrives, a rule pass flags suspect lines and a model fixes only those; then a pronoun
-//           check against the Ledger. The original is kept; ⟲ in the message menu toggles back.
+//   Checks: after the Ledger update, a pronoun check and a cut-only body-rules pass against it. The original is
+//           kept; ⟲ in the message menu toggles back.
+//   Mind:   the Mind Book (mind-core.js): what Hypnosis, Mind Control and Altered Perception have put into people,
+//           one record per mode, updated only on replies that need it, injected at depth 1 with live watcher lines. (The style Editor is its own extension now, WH Editor;
+//           the two share the ⟲ record and take turns on a reply.)
 //   Cards:  Make card (a card-builder chat → a character with its modes) and Check card (Card Doctor).
 // Each background job runs through a connection profile picked under Settings → Models.
 import { ConnectionManagerRequestService } from '../../shared.js';
 import { getPresetManager } from '../../../preset-manager.js';
 import { loadWorldInfo, saveWorldInfo, updateWorldInfoList, world_names } from '../../../world-info.js';
-import { detect, buildEditorMessages, parseEditorResponse, applyEdits, looksLikeRoleplay, collapseHedges, bannedPatterns } from './editor-core.js';
+import { looksLikeRoleplay } from './text-core.js';
 import { MODE_GROUPS, MODIFIERS, PARENT, ALL_MODES, MODE_BLURBS, expandModes, planEntry, buildSuggestMessages, parseSuggestResponse, DISPLAY_SCRIPTS } from './codex-core.js';
 import {
-    EMPTY_LEDGER, normalizeLedger, isEmptyLedger, buildLedgerMessages, parseLedger, parseLedgerUpdate, verifyNewRides, renderLedger, akaOf, aliasResolver,
-    labelMultiRides, rosterOf,
+    EMPTY_LEDGER, normalizeLedger, isEmptyLedger, buildLedgerMessages, parseLedger, parseLedgerUpdate, verifyNewRides, verifyEndedRides, renderLedger, akaOf, aliasResolver,
+    labelMultiRides, rosterOf, tracksBodies, LEDGER_MODES,
     hasCrossedBodies, buildPronounMessages, parsePronounResponse, applyPronounFixes, buildLintMessages, parseLintResponse, applyCuts,
     endedRides, bodyHistory, renderHistory, historyGroups, buildHistoryMessages, parseHistoryResponse,
 } from './ledger-core.js';
 import { parseBuilderChat, buildCard, doctorCard, buildReviewMessages, estimateTokens } from './card-core.js';
+import { MIND_MODES, KINDS as MIND_KINDS, STAGES as MIND_STAGES, EMPTY_BOOK, normalizeBook, isEmptyBook, needsUpdate, buildMindMessages, applyMindUpdate, renderMindBook, trappedSelfCuts, resistanceSetUp } from './mind-core.js';
 
 const MODULE = 'worldhopper';
 const LOG = '[Worldhopper]';
@@ -33,22 +37,13 @@ const RECENT_REPLIES = 30;   // "Build history" can read just this many of the l
 const IN_CHAT = 1;   // extension_prompt_types.IN_CHAT
 const SYSTEM = 0;    // extension_prompt_roles.SYSTEM
 const DEFAULTS = {
-    codex: { enabled: true, world: 'WH Metaphysics', anchors: true, details: true, initiative: true, suggest: true, selections: {}, suggested: {}, installedHash: '' },
+    // Worldhopper on or off (the switch in its heading). Off, nothing is added to prompts and no model runs; what's
+    // already in the chat (moment boxes, badges, ⟲) still shows.
+    enabled: true,
+    codex: { world: 'WH Metaphysics', initiative: true, selections: {}, suggested: {}, installedHash: '' },
     // Connection profiles, picked under Settings → Models. The Ledger runs after every reply, so a fast model suits
     // it; history notes need judgement about who remembers what, so a stronger model suits them.
-    ledger: { enabled: true, strip: true, badges: true, lanes: true, lanesCompact: false, history: true, profile: '', notesProfile: '' },
-    editor: {
-        enabled: true,
-        profile: '',
-        onlyChatCompletion: true,
-        temperature: 0.2,
-        maxTokens: 600,
-        maxCandidates: 8,
-        pronouns: true,
-        lint: true,
-        personal: [],
-        checks: { banlist: true, contrast: true, staccato: true, hedges: true, fragments: true, echo: true, repetition: true },
-    },
+    ledger: { enabled: true, lanesCompact: false, profile: '', notesProfile: '' },
 };
 
 const ctx = () => SillyTavern.getContext();
@@ -56,18 +51,27 @@ const ctx = () => SillyTavern.getContext();
 function settings() {
     const all = ctx().extensionSettings;
     const s = (all[MODULE] ??= {});
+    s.enabled ??= DEFAULTS.enabled;
     s.codex = { ...DEFAULTS.codex, ...(s.codex || {}) };
     s.codex.selections ??= {};
     s.codex.suggested ??= {};
+    // Perception Rewrite is called Altered Perception now.
+    for (const map of [s.codex.selections, s.codex.suggested]) {
+        for (const k of Object.keys(map)) if (Array.isArray(map[k]) && map[k].includes('Perception Rewrite')) map[k] = map[k].map(m => m === 'Perception Rewrite' ? 'Altered Perception' : m);
+    }
     const hadLedgerProfile = s.ledger && 'profile' in s.ledger;
     s.ledger = { ...DEFAULTS.ledger, ...(s.ledger || {}) };
-    s.editor = { ...DEFAULTS.editor, ...(s.editor || {}) };
-    s.editor.checks = { ...DEFAULTS.editor.checks, ...(s.editor.checks || {}) };
     // Before 0.2 the Ledger used the Editor's model; keep it that way for existing setups.
-    if (!hadLedgerProfile) s.ledger.profile = s.editor.profile || '';
+    if (!hadLedgerProfile) s.ledger.profile = s.editor?.profile || '';
+    // These used to be switches and are simply part of Worldhopper now; the heading's switch turns everything off.
+    for (const k of ['enabled', 'anchors', 'details', 'suggest']) delete s.codex[k];
+    for (const k of ['strip', 'badges', 'lanes', 'history']) delete s.ledger[k];
+    // s.editor is left as it was: the WH Editor (its own extension now) takes its settings from there once.
     return s;
 }
 const save = () => ctx().saveSettingsDebounced();
+/** Worldhopper is switched on (the switch in its heading). */
+const on = () => settings().enabled !== false;
 
 // One queue for the per-reply jobs (Ledger, Editor, suggestions), so their requests never overlap.
 let queue = Promise.resolve();
@@ -102,12 +106,9 @@ async function askProfile(name, messages, maxTokens, temperature, { signal = nul
     return typeof res === 'string' ? res : String(res?.content ?? '');
 }
 
-/** The Ledger's model: ledger updates, their checks, and mode suggestions. */
+/** The Ledger's model: ledger updates, their checks, the body checks on each reply, and mode suggestions. */
 const ledgerProfile = () => settings().ledger.profile;
 const askLedger = (messages, maxTokens, temperature) => askProfile(ledgerProfile(), messages, maxTokens, temperature);
-
-/** The Editor's model: line fixes, the pronoun check and the body-rule cuts. */
-const askEditor = (messages, maxTokens, temperature) => askProfile(settings().editor.profile, messages, maxTokens, temperature);
 
 /** Model for Body History notes and card reviews; the Ledger's when none is picked. */
 const notesProfile = () => settings().ledger.notesProfile || ledgerProfile();
@@ -157,7 +158,7 @@ function setModes(list) {
 
 async function onEntriesLoaded(lore) {
     const s = settings().codex;
-    if (!s.enabled) return;
+    if (!on()) return;
     const active = expandModes(currentModes());
     if (!active.size) return;
 
@@ -174,7 +175,7 @@ async function onEntriesLoaded(lore) {
     for (const list of lists) {
         for (const e of list) {
             if (e.world !== s.world) continue;
-            const plan = planEntry(e.comment, active, s);
+            const plan = planEntry(e.comment, active, { initiative: s.initiative });
             if (plan === 'constant') { e.disable = false; e.constant = true; n++; }
             else if (plan === 'keyed') { e.disable = false; n++; }
         }
@@ -268,7 +269,7 @@ function cardText(ch) {
 async function suggestModes({ force = false } = {}) {
     const s = settings().codex;
     const t = selectionTarget();
-    if (!t?.character || (!force && (!s.suggest || currentModes().length || s.suggested[t.key]))) return;
+    if (!on() || !t?.character || (!force && (currentModes().length || s.suggested[t.key]))) return;
     if (t.character.data?.extensions?.worldhopper?.tool) return;   // a card builder has no modes of its own
     if (!ledgerProfile() && !force) return;
     let modes;
@@ -313,12 +314,11 @@ function renderCodexPanel() {
     $('#wh_codex_blurb, #wh_codex_missing').remove();
     const builder = !!t?.character?.data?.extensions?.worldhopper?.tool;   // a card builder has no modes of its own
     if (!t) chips.append('<span class="wh-empty">Open a chat to pick its modes.</span>');
-    else if (!s.enabled) chips.append('<span class="wh-empty">The Codex is off (Settings → Codex).</span>');
     else if (builder && !picked.size) chips.append('<span class="wh-empty">This is a card builder, so it has no modes of its own. When the card is done, use <b>Make card</b> in the wand menu.</span>');
     else if (!picked.size) chips.append('<span class="wh-empty">None yet. Tap <i class="fa-solid fa-pen"></i> to pick some, or <i class="fa-solid fa-wand-magic-sparkles"></i> to suggest them from the card. Only what you pick is ever used.</span>');
     else for (const m of expandModes([...picked])) chips.append($('<span class="wh-chip" tabindex="0"></span>').addClass(`wh-g-${groupOf(m)}`).text(m).attr('title', MODE_BLURBS[m] || '').data('mode', m));
-    if (s.enabled && Array.isArray(world_names) && !world_names.includes(s.world)) {
-        chips.after($('<div id="wh_codex_missing" class="wh-warning"></div>').text(`The Codex lorebook “${s.world}” isn't installed, so modes have no effect yet (Settings → Codex).`));
+    if (on() && Array.isArray(world_names) && !world_names.includes(s.world)) {
+        chips.after($('<div id="wh_codex_missing" class="wh-warning"></div>').text(`The Codex lorebook “${s.world}” isn't installed, so modes have no effect yet (Settings → Choices).`));
     }
 
     const box = $('#wh_codex_modes').empty();
@@ -328,20 +328,20 @@ function renderCodexPanel() {
             const id = 'wh_mode_' + m.replace(/\W+/g, '_');
             const pill = $(`<label class="wh-pill${MODIFIERS.has(m) ? ' wh-modifier' : ''}" for="${id}"></label>`)
                 .attr('title', (MODE_BLURBS[m] || '') + (PARENT[m] ? ` (modifier: also switches on ${PARENT[m]})` : ''));
-            const cb = $(`<input type="checkbox" id="${id}">`).prop('checked', picked.has(m)).prop('disabled', !t || !s.enabled).data('mode', m);
+            const cb = $(`<input type="checkbox" id="${id}">`).prop('checked', picked.has(m)).prop('disabled', !t || !on()).data('mode', m);
             row.append(pill.append(cb, $('<span></span>').text(m)));
         }
         box.append(row);
     }
-    const open = pickerOpen ?? (!!t && s.enabled && !picked.size && !builder);
+    const open = pickerOpen ?? (!!t && on() && !picked.size && !builder);
     box.toggle(open);
-    chips.toggle(!open || !t || !s.enabled);   // the pills already show the picks while the picker is open
+    chips.toggle(!open || !t || !on());   // the pills already show the picks while the picker is open
     $('#wh_codex_edit').toggleClass('wh-on', open).toggleClass('fa-pen', !open).toggleClass('fa-check', open)
-        .attr('title', open ? 'Done' : "Change this card's modes").toggle(!!t && s.enabled);
-    $('#wh_codex_suggest_now').toggle(!!t && s.enabled);
+        .attr('title', open ? 'Done' : "Change this card's modes").toggle(!!t && on());
+    $('#wh_codex_suggest_now').toggle(!!t && on());
 
     const sug = t ? s.suggested[t.key] : null;
-    const showSug = t && s.enabled && !picked.size && Array.isArray(sug) && sug.length;
+    const showSug = t && on() && !picked.size && Array.isArray(sug) && sug.length;
     $('#wh_codex_suggestion').toggle(!!showSug);
     $('#wh_codex_suggestion_text').text(showSug ? `Suggested: ${sug.join(', ')}` : '');
 }
@@ -366,13 +366,11 @@ function headLedger(beforeIndex) {
     return base ? { ledger: normalizeLedger(base), index: -1 } : null;
 }
 
-// Modes that give the Ledger nothing to track (nobody changes body or mind). With only these picked, it stays off
-// rather than spending a model call on every reply.
-const TRACKLESS = new Set(['Timestop']);
-
+// The Ledger only runs where a mind inhabits another body (LEDGER_MODES). Every other mode gives it nothing to track,
+// so with only those picked it stays off rather than spending a model call on every reply.
 function ledgerWanted() {
-    if (!settings().ledger.enabled) return false;
-    return currentModes().some(m => !TRACKLESS.has(m)) || !isEmptyLedger(headLedger()?.ledger);
+    if (!on() || !settings().ledger.enabled) return false;
+    return tracksBodies([...expandModes(currentModes())]) || !isEmptyLedger(headLedger()?.ledger);
 }
 
 function storeLedger(mesId, ledger) {
@@ -434,6 +432,12 @@ async function updateLedger(mesId, { rebuild = false, save = true } = {}) {
             next = v.ledger;
             if (v.log.length) console.log(LOG, 'new body changes checked', v.log);
         } catch { /* the check is a filter: if the model can't be reached, keep the update as it was */ }
+        // And every body that left gets one too: a scene moving on, or the possessor busy in another body, ends nothing.
+        try {
+            const e = await verifyEndedRides(base.ledger, next, { messages: msgs, context, userName, modes }, (m, max) => askLedger(m, max, 0.1));
+            next = e.ledger;
+            if (e.log.length) console.log(LOG, 'ended body changes checked', e.log);
+        } catch { /* as above */ }
     }
     next = labelMultiRides(next, modes);
     if (chatKey() !== key || !ctx().chat?.[mesId]) return fail;
@@ -441,8 +445,9 @@ async function updateLedger(mesId, { rebuild = false, save = true } = {}) {
     if (save) await ctx().saveChat();
     applyLedgerInjection();
     renderLedgerPanel();
-    ledgerStatus(`Ledger updated (${((performance.now() - t0) / 1000).toFixed(1)}s).`);
-    return { ok: true, ended: rebuild ? [] : endedRides(base?.ledger || EMPTY_LEDGER, next) };
+    const ms = Math.round(performance.now() - t0);
+    ledgerStatus(`Ledger updated (${(ms / 1000).toFixed(1)}s).`);
+    return { ok: true, ms, ended: rebuild ? [] : endedRides(base?.ledger || EMPTY_LEDGER, next) };
 }
 
 // ------------------------------------------------------------------ Body History
@@ -524,7 +529,7 @@ async function backfillHistory() {
                 const r = await updateLedger(i, { save: false });
                 if (!r.ok) continue;
                 done++;
-                if (r.ended.length && settings().ledger.history) { endings++; await noteEndedRides(i, r.ended, { save: false }); }
+                if (r.ended.length) { endings++; await noteEndedRides(i, r.ended, { save: false }); }
                 ledgerStatus(`Building history: ${done} of ${todo.length} replies…`);
                 if (done % 10 === 0) await ctx().saveChat();
             }
@@ -542,9 +547,10 @@ async function backfillHistory() {
 function applyLedgerInjection(type) {
     const c = ctx();
     const s = settings().ledger;
-    if (!s.enabled || type === 'quiet') {
+    if (!on() || !s.enabled || type === 'quiet') {
         c.setExtensionPrompt(LEDGER_KEY, '', IN_CHAT, 1, false, SYSTEM);
         c.setExtensionPrompt(HISTORY_KEY, '', IN_CHAT, HISTORY_DEPTH, false, SYSTEM);
+        c.setExtensionPrompt(MIND_KEY, '', IN_CHAT, 1, false, SYSTEM);
         return;
     }
     // A swipe or regenerate rewrites the last reply, so the state to write from is the one before it.
@@ -559,7 +565,13 @@ function applyLedgerInjection(type) {
     for (let i = limit - 1; i >= 0; i--) if (chat[i]?.is_user) { lastUserText = chat[i].mes; break; }
     const text = head ? renderLedger(head.ledger, c.name1 || 'User', { lastUserText }) : '';
     c.setExtensionPrompt(LEDGER_KEY, text, IN_CHAT, 1, false, SYSTEM);
-    c.setExtensionPrompt(HISTORY_KEY, s.history ? historyText(limit) : '', IN_CHAT, HISTORY_DEPTH, false, SYSTEM);
+    c.setExtensionPrompt(HISTORY_KEY, historyText(limit), IN_CHAT, HISTORY_DEPTH, false, SYSTEM);
+    // The Mind Book, with the watcher lines for the reply about to be written: your newest message, and the scene
+    // as the last two messages leave it.
+    const kinds = mindKinds();
+    const mind = kinds.length ? headMind(limit) : null;
+    const recent = chat.slice(Math.max(0, limit - 2), limit).filter(inStory).map(m => m.mes).join('\n');
+    c.setExtensionPrompt(MIND_KEY, mind ? renderMindBook(mind.book, c.name1 || 'User', { kinds, latest: lastUserText, recent }) : '', IN_CHAT, 1, false, SYSTEM);
 }
 
 function ledgerStatus(text) {
@@ -579,6 +591,7 @@ function panelRow(main, sub, hidden, kind = '', icon = '') {
 }
 
 function renderLedgerPanel() {
+    renderMindPanel();
     const ledger = headLedger()?.ledger;
     const box = $('#wh_ledger_summary').empty();
     const canon = aliasResolver(ledger);
@@ -591,25 +604,20 @@ function renderLedgerPanel() {
         const kind = !b.driver || !body ? 'idle' : !copy && canon(b.driver) === me ? 'you' : 'npc';
         box.append(panelRow(main, sub, b.user_knows === 'no' && body && b.driver, kind, copy ? 'fa-clone' : kind === 'idle' ? 'fa-user-slash' : kind === 'you' ? 'fa-user' : 'fa-ghost'));
     }
-    for (const m of ledger?.minds || []) {
-        const main = `${m.who}'s mind${m.by ? ` ← ${m.by}` : ''}`;
-        const sub = [m.how, m.changes, m.triggers ? `triggers: ${m.triggers}` : '', m.state].filter(Boolean).join(' · ');
-        box.append(panelRow(main, sub, m.user_knows === 'no', m.by && canon(m.by) === me ? 'you' : 'npc', 'fa-brain'));
-    }
     const extra = [
         ledger?.powers?.length ? `Powers: ${ledger.powers.map(p => `${p.who} (${p.power})`).join(', ')}` : '',
         ledger?.aliases?.length ? `Also known as: ${ledger.aliases.map(a => [a.name, ...a.aka].join(' = ')).join('; ')}` : '',
     ].filter(Boolean);
     for (const x of extra) box.append($('<div class="wh-row-sub wh-extra"></div>').text(x));
-    if (!ledger?.bodies?.length && !ledger?.minds?.length) {
+    if (!ledger?.bodies?.length) {
         const modes = currentModes();
-        const idle = modes.length && modes.every(m => TRACKLESS.has(m));
-        box.prepend($('<div class="wh-empty"></div>').text(idle ? `${modes.join(', ')} leaves nothing for the Ledger to track, so it stays off in this chat.`
-            : ledgerWanted() ? 'Everyone is in their own body, with their own mind.' : 'Starts once this chat has a mode.'));
+        const idle = modes.length && !tracksBodies([...expandModes(modes)]);
+        box.prepend($('<div class="wh-empty"></div>').text(idle ? `The Ledger tracks who is in which body, so it stays off with ${modes.join(', ')}. It runs with ${LEDGER_MODES.filter(m => !['Copy Fidelity', 'Reverse Vore'].includes(m)).join(', ')}.`
+            : ledgerWanted() ? 'Everyone is in their own body.' : 'Starts once this chat has a mode where someone inhabits another body.'));
     }
 
     const hist = $('#wh_ledger_history').empty();
-    const groups = settings().ledger.history ? historyGroups(bodyHistory(ledgerSnapshots())) : [];
+    const groups = historyGroups(bodyHistory(ledgerSnapshots()));
     if (groups.length) hist.append('<div class="wh-mini-title">History</div>');
     for (const g of groups) {
         const times = g.ended === 1 ? 'once' : g.ended === 2 ? 'twice' : `${g.ended}×`;
@@ -620,8 +628,6 @@ function renderLedgerPanel() {
     }
     hist.toggle(groups.length > 0);
     $('#wh_ledger_enabled').prop('checked', settings().ledger.enabled);
-    $('#wh_ledger_strip_on').prop('checked', settings().ledger.strip);
-    $('#wh_ledger_history_on').prop('checked', settings().ledger.history);
     renderStrip();
     renderBadges();
 }
@@ -630,22 +636,26 @@ function renderLedgerPanel() {
 let ledgerBusy = false;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// The bars above the chat: the Ledger's, then the Mind Book's under it. Made together, so they always stack the same way.
+function ensureStrips() {
+    if ($('#wh_ledger_strip').length) return;
+    const bar = (id, cls, title, open) => $(`<div id="${id}" class="wh-ledger-strip ${cls}" title="${title}" role="button" tabindex="0"></div>`)
+        .on('click keydown', e => { if (e.type === 'click' || e.key === 'Enter') open(); }).hide();
+    $('#chat').before(bar('wh_ledger_strip', '', 'Body Ledger — tap to edit', openLedgerEditor), bar('wh_mind_strip', 'wh-mind-strip', 'Mind Book — tap to edit', openMindEditor));
+}
+
 function renderStrip() {
-    if (!$('#wh_ledger_strip').length) {
-        const strip = $('<div id="wh_ledger_strip" class="wh-ledger-strip" title="Body Ledger — tap to edit" role="button" tabindex="0"></div>');
-        strip.on('click keydown', e => { if (e.type === 'click' || e.key === 'Enter') openLedgerEditor(); });
-        $('#chat').before(strip);
-    }
+    ensureStrips();
     const s = settings().ledger;
     const ledger = headLedger()?.ledger;
     const bodies = ledger?.bodies || [];
-    const minds = ledger?.minds || [];
-    if (!s.enabled || !s.strip || !ctx().chat?.length || (!bodies.length && !minds.length && !ledgerBusy)) { $('#wh_ledger_strip').hide(); return; }
+    // The roster goes with it: a chat with no bodies must not keep the last chat's cards over the message box.
+    if (!on() || !s.enabled || !ctx().chat?.length || (!bodies.length && !ledgerBusy)) { $('#wh_ledger_strip').hide(); renderLanes(); return; }
     const canon = aliasResolver(ledger);
     const me = canon(ctx().name1 || '');
     const chip = (kind, icon, title, sub, tip, hidden) => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}" title="${esc(tip)}"><i class="fa-solid ${icon} wh-chip-icon"></i>`
         + `<span class="wh-chip-text"><b>${esc(title)}</b><small>${esc(sub)}${hidden ? ' · hidden <i class="fa-solid fa-eye-slash"></i>' : ''}</small></span></span>`;
-    // Two lines per body or mind; the colour says who is doing it: teal when it's you, violet when it's someone else.
+    // Two lines per body; the colour says who is doing it: teal when it's you, violet when it's someone else.
     // A copy is its own person even when it's a copy of you, so it's always violet.
     const chips = bodies.map(b => {
         const body = b.body && b.body.toLowerCase() !== 'none' ? b.body : null;
@@ -658,13 +668,7 @@ function renderStrip() {
         const aka = body ? akaOf(ledger, body) : [];
         const tip = [b.how, b.host ? `own mind: ${b.host}` : '', aka.length ? `also ${aka.join(', ')}` : '', b.user_knows === 'no' ? 'hidden from you' : ''].filter(Boolean).join(' · ');
         return chip(kind, icon, title, sub, tip, b.user_knows === 'no');
-    }).concat(minds.map(m => {
-        const mine = m.by && canon(m.by) === me;
-        const title = canon(m.who) === me ? 'You' : m.who;
-        const sub = [m.how, mine ? 'by you' : m.by ? `by ${m.by}` : ''].filter(Boolean).join(' · ');
-        const tip = [m.changes, m.triggers ? `triggers: ${m.triggers}` : '', m.state ? `now: ${m.state}` : '', m.user_knows === 'no' ? 'hidden from you' : ''].filter(Boolean).join(' · ');
-        return chip(mine ? 'you' : 'npc', 'fa-brain', title, sub, tip, m.user_knows === 'no');
-    }));
+    });
     $('#wh_ledger_strip').html(`${chips.join('')}${ledgerBusy ? '<span class="wh-busy">updating…</span>' : ''}`).show();
     renderLanes();
 }
@@ -711,7 +715,7 @@ function renderLanes() {
         $('#send_textarea').on('input click keyup focus', markLanes);
     }
     const s = settings().ledger;
-    const ledger = s.enabled && s.lanes ? headLedger()?.ledger : null;
+    const ledger = on() && s.enabled ? headLedger()?.ledger : null;
     const roster = ledger ? rosterOf(ledger, ctx().name1 || '') : [];
     if (!roster.length) { $('#wh_lanes').hide().empty(); return; }
     const big = roster.length > 6;
@@ -779,7 +783,7 @@ function renderBadges() {
     $('#chat .wh-as').remove();
     const s = settings().ledger;
     const chat = ctx().chat || [];
-    if (!s.enabled || !s.badges || !chat.length) return;
+    if (!s.enabled || !chat.length) return;
     let ledger = ctx().chatMetadata?.[LEDGER_KEY] ? normalizeLedger(ctx().chatMetadata[LEDGER_KEY]) : null;
     for (let i = 0; i < chat.length; i++) {
         const m = chat[i];
@@ -813,7 +817,7 @@ async function openLedgerEditor() {
     const head = headLedger();
     const ledger = normalizeLedger(head?.ledger || EMPTY_LEDGER);
     const root = $('<div class="wh-ledger-editor"></div>');
-    root.append('<h3>Body Ledger</h3><small class="wh-muted">Who is in which body right now, and whose mind has been changed. Tap a row to edit it; the next update builds on what you save.</small>');
+    root.append('<h3>Body Ledger</h3><small class="wh-muted">Who is in which body right now. Tap a row to edit it; the next update builds on what you save.</small>');
 
     const bodies = $('<div class="wh-ledger-rows"></div>');
     const bodyRow = (b = {}, open = false) => {
@@ -841,32 +845,6 @@ async function openLedgerEditor() {
     ledger.bodies.forEach(b => bodies.append(bodyRow(b)));
     root.append(bodies, $('<div class="menu_button">+ Body</div>').on('click', () => bodies.append(bodyRow({}, true))));
 
-    root.append('<div class="wh-mini-title" title="Whose mind a power has changed while they stay in their own body: hypnosis, mind control, rewrites, drones, dolls.">Minds</div>');
-    const minds = $('<div class="wh-ledger-rows"></div>');
-    const mindRow = (m = {}, open = false) => {
-        const card = $('<details class="wh-body-card"></details>').prop('open', open);
-        const title = $('<span class="wh-body-title"></span>');
-        const sum = $('<summary></summary>').append(title, delButton(() => card.remove()));
-        const fields = $('<div class="wh-fields"></div>').append(
-            field('who', 'Whose mind', 'who was changed', m.who), field('by', 'By', 'who did it (blank if nobody)', m.by),
-            field('how', 'How', 'hypnosis, mind control, doll…', m.how, 'wh-full'),
-            field('changes', 'What changed', 'beliefs, loyalties, rules, what they can\'t perceive', m.changes, 'wh-full'),
-            field('triggers', 'Triggers', 'a cue and what it does', m.triggers, 'wh-full'),
-            field('state', 'Right now', 'deep trance, awake, posed…', m.state, 'wh-full'),
-            $('<label class="checkbox_label wh-full"></label>').append($('<input type="checkbox" data-k="user_knows">').prop('checked', m.user_knows !== 'no'), $('<span>You know about this</span>')),
-        );
-        const refresh = () => {
-            const v = k => String(card.find(`[data-k="${k}"]`).val() || '').trim();
-            title.text(`${v('who') || 'Someone'}'s mind${v('by') ? ` ← ${v('by')}` : ''}`).append(v('how') ? $('<small></small>').text(` · ${v('how')}`) : '');
-            if (!card.find('[data-k="user_knows"]').prop('checked')) title.append(' <i class="fa-solid fa-eye-slash" title="hidden from you"></i>');
-        };
-        card.append(sum, fields).on('input change', refresh);
-        refresh();
-        return card;
-    };
-    ledger.minds.forEach(m => minds.append(mindRow(m)));
-    root.append(minds, $('<div class="menu_button">+ Mind</div>').on('click', () => minds.append(mindRow({}, true))));
-
     const pairRow = (a, b, extra = '') => {
         const row = $(`<div class="wh-pair ${extra}"></div>`);
         return row.append(a, b, delButton(() => row.remove()));
@@ -893,7 +871,7 @@ async function openLedgerEditor() {
         return o;
     }).get();
     // Saved as typed: the "once you know, you keep knowing" rule only guards the model's updates, not your edits.
-    const next = normalizeLedger({ bodies: read(bodies, '.wh-body-card'), own: ledger.own, minds: read(minds, '.wh-body-card'), powers: read(powers, '.wh-pair'), aliases: read(aliases, '.wh-pair') });
+    const next = normalizeLedger({ bodies: read(bodies, '.wh-body-card'), own: ledger.own, powers: read(powers, '.wh-pair'), aliases: read(aliases, '.wh-pair') });
     storeLedger(c.chat.length - 1, next);
     await c.saveChat();
     applyLedgerInjection();
@@ -901,10 +879,267 @@ async function openLedgerEditor() {
     toastr.success('Body Ledger saved.');
 }
 
-// ------------------------------------------------------------------ Editor
+// ------------------------------------------------------------------ Mind Book
 
-function status(text) {
-    $('#wh_editor_status').text(text);
+// The Mind Book follows the Ledger's pattern: a snapshot on the reply that changed it (and in swipe_info), so swipes
+// and deletes roll it back, and the newest snapshot is the book.
+const MIND_KEY = 'worldhopper_mind';
+
+/** The mind modes picked for this chat, as Mind Book kinds (hypnosis, control, perception). */
+function mindKinds() {
+    const modes = expandModes(currentModes());
+    return MIND_KINDS.filter(k => modes.has(MIND_MODES[k]));
+}
+
+function headMind(beforeIndex) {
+    const chat = ctx().chat || [];
+    for (let i = Math.min(beforeIndex ?? chat.length, chat.length) - 1; i >= 0; i--) {
+        const b = chat[i]?.extra?.wh_mind;
+        if (b) return { book: normalizeBook(b), index: i };
+    }
+    return null;
+}
+
+function storeMind(mesId, book) {
+    const msg = ctx().chat?.[mesId];
+    if (!msg) return;
+    const b = normalizeBook(book);
+    msg.extra ??= {};
+    msg.extra.wh_mind = b;
+    const info = msg.swipe_info?.[msg.swipe_id];
+    if (info) { info.extra ??= {}; info.extra.wh_mind = b; }
+}
+
+/** The Mind Book updates with the Ledger (the same switch and model), in chats with a mind mode picked. */
+const mindWanted = () => on() && settings().ledger.enabled && mindKinds().length > 0;
+
+/**
+ * Update each picked mind mode's record from the newest messages, one small prompt per mode, and only for the modes
+ * the messages give something to do (a marked moment, someone still in trance, the mode's words). The first update
+ * in a chat reads the card and runs every picked mode. Returns { ms, ran } or null.
+ */
+async function updateMind(mesId, { save = true } = {}) {
+    const kinds = mindKinds();
+    const chat = ctx().chat || [];
+    if (!kinds.length || !chat[mesId]) return null;
+    const key = chatKey();
+    const base = headMind(mesId);
+    const first = !base;
+    const from = base ? base.index + 1 : Math.max(0, mesId - 5);
+    const say = m => ({ name: speakerName(m), text: m.mes });
+    const msgs = chat.slice(Math.max(from, mesId - 5), mesId + 1).filter(inStory).map(say);
+    const context = base ? chat.slice(Math.max(0, base.index - 1), base.index + 1).filter(inStory).map(say) : [];
+    const text = msgs.map(m => m.text).join('\n');
+    const userName = ctx().name1 || 'User';
+    const t = selectionTarget();
+    const card = first && t?.character ? cardText(t.character) : '';
+    let book = base?.book || EMPTY_BOOK;
+    let ran = 0;
+    const t0 = performance.now();
+    try {
+        for (const kind of kinds) {
+            if (!first && !needsUpdate(kind, book, text)) continue;
+            if (!mindBusy) { mindBusy = true; renderMindStrip(); }
+            let answer;
+            try { answer = await askLedger(buildMindMessages(kind, { book, messages: msgs, context, userName, card }), 700, 0.1); }
+            catch { ledgerStatus(`Mind Book: ${unreachable(ledgerProfile())}.`); return null; }
+            ran++;
+            const next = applyMindUpdate(kind, book, answer);
+            if (next) book = next;
+            else console.warn(LOG, `Mind Book (${kind}): unreadable answer`, answer);
+        }
+    } finally {
+        if (mindBusy) { mindBusy = false; renderMindStrip(); }
+    }
+    if (!ran || chatKey() !== key || !ctx().chat?.[mesId]) return null;
+    if (first || JSON.stringify(book) !== JSON.stringify(base.book)) {
+        storeMind(mesId, book);
+        if (save) await ctx().saveChat();
+    }
+    applyLedgerInjection();
+    renderMindPanel();
+    return { ms: Math.round(performance.now() - t0), ran };
+}
+
+/**
+ * Mind Control has no trapped self: cut sentences that write one (no model), unless a struggle has been set up, by the
+ * card, by your newest message, or in play (a will the Mind Book records as resisting).
+ */
+async function runMindCuts(mesId) {
+    if (!mindKinds().includes('control')) return;
+    const t = selectionTarget();
+    if (resistanceSetUp(t?.character ? cardText(t.character) : '')) return;
+    const chat = ctx().chat || [];
+    let lastUser = '';
+    for (let i = mesId - 1; i >= 0; i--) if (chat[i]?.is_user) { lastUser = chat[i].mes || ''; break; }
+    if (resistanceSetUp(lastUser)) return;
+    if (headMind(mesId + 1)?.book.control.some(w => w.resists === 'yes')) return;
+    const msg = ctx().chat?.[mesId];
+    if (!msg || msg.is_user || msg.is_system || !msg.mes || !looksLikeRoleplay(msg.mes)) return;
+    await new Promise(r => setTimeout(r, 0));
+    await globalThis.WHEditor?.whenDone?.(mesId);
+    const original = ctx().chat?.[mesId]?.mes;
+    const cuts = trappedSelfCuts(original);
+    if (!cuts.length) return;
+    const out = applyCuts(original, cuts);
+    const now = ctx().chat?.[mesId];
+    if (!out.applied.length || !now || now.mes !== original) return;
+    writeMessage(now, out.text);
+    recordEdit(now, original, out.text, out.applied.map(a => ({ ...a, why: 'trapped self under mind control' })));
+    ctx().updateMessageBlock(mesId, now);
+    markEdited(mesId);
+    await ctx().saveChat();
+    checksStatus(`Mind control: cut ${out.applied.length} line${out.applied.length > 1 ? 's' : ''} writing a trapped self. ⟲ restores the original.`);
+}
+
+let mindBusy = false;
+
+/**
+ * The Mind Book's bar above the chat: a chip per hypnotized person (their trance, or how many times they've been
+ * under), per controlled will and per perception edit. Teal when you're the one doing it, violet when someone else
+ * is, dashed when it's kept from you. Tap to edit.
+ */
+function renderMindStrip() {
+    ensureStrips();
+    const book = headMind()?.book;
+    if (!mindWanted() || !ctx().chat?.length || (isEmptyBook(book) && !mindBusy)) { $('#wh_mind_strip').hide(); return; }
+    const me = String(ctx().name1 || '').toLowerCase();
+    const mine = by => (by && by.toLowerCase() === me ? 'you' : 'npc');
+    const chip = (kind, icon, title, sub, tip, hidden) => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}" title="${esc(tip)}"><i class="fa-solid ${icon} wh-chip-icon"></i>`
+        + `<span class="wh-chip-text"><b>${esc(title)}</b><small>${esc(sub)}${hidden ? ' · hidden <i class="fa-solid fa-eye-slash"></i>' : ''}</small></span></span>`;
+    const you = n => (n && n.toLowerCase() === me ? 'you' : n);
+    const chips = [
+        ...(book?.hypnosis || []).map(h => chip(mine(h.by), 'fa-circle-dot', h.who,
+            h.now === 'awake' ? (h.times ? `awake · under ${h.times}×` : 'awake') : `${h.now} trance`,
+            ['hypnosis', h.by ? `by ${you(h.by)}` : '', h.suggestions.length ? `${h.suggestions.length} suggestion${h.suggestions.length > 1 ? 's' : ''}` : '', h.triggers.length ? `triggers: ${h.triggers.map(t => `"${t.cue}"`).join(', ')}` : ''].filter(Boolean).join(' · '),
+            h.user_knows === 'no')),
+        ...(book?.control || []).map(w => chip(mine(w.by), 'fa-hand-sparkles', w.who.join(', '),
+            `${w.by ? (mine(w.by) === 'you' ? 'your control' : `${w.by}'s control`) : 'controlled'}${w.resists === 'yes' ? ' · resisting' : ''}`,
+            ['mind control', ...w.set.map(x => `${x.kind} ${x.text}`)].join(' · '), w.user_knows === 'no')),
+        ...(book?.perception || []).map(e => chip(mine(e.by), 'fa-eye-slash',
+            e.everyone ? `Everyone${e.except.length ? ` but ${e.except.join(', ')}` : ''}` : e.who.join(', '),
+            e.kind === 'unseen' ? `can't perceive ${you(e.target)}` : e.kind === 'false' ? 'believes a falsehood' : 'altered normal',
+            ['altered perception', e.what, e.by ? `by ${you(e.by)}` : ''].filter(Boolean).join(' · '), e.user_knows === 'no')),
+    ];
+    $('#wh_mind_strip').html(`<span class="wh-strip-label" title="Mind Book"><i class="fa-solid fa-brain"></i></span>${chips.join('')}${mindBusy ? '<span class="wh-busy">updating…</span>' : ''}`).show();
+}
+
+function renderMindPanel() {
+    renderMindStrip();
+    const kinds = mindKinds();
+    const head = headMind();
+    const book = head?.book;
+    const show = on() && (kinds.length > 0 || !isEmptyBook(book));
+    $('#wh_mind_card').toggle(show);
+    if (!show) return;
+    const box = $('#wh_mind_summary').empty();
+    const me = String(ctx().name1 || '').toLowerCase();
+    const mine = by => by && by.toLowerCase() === me ? 'you' : 'npc';
+    for (const h of book?.hypnosis || []) {
+        const main = `${h.who} · ${h.now === 'awake' ? 'awake' : `${h.now} trance`}`;
+        const sub = [h.by ? `by ${h.by}` : '', h.susceptibility ? `${h.susceptibility} susceptibility` : '', h.times ? `under ${h.times}×, deepest ${h.deepest || 'light'}` : '',
+            h.suggestions.length ? `${h.suggestions.length} suggestion${h.suggestions.length > 1 ? 's' : ''}: ${h.suggestions.map(x => x.text).join('; ')}` : '',
+            h.triggers.length ? `triggers: ${h.triggers.map(x => `"${x.cue}"`).join(', ')}` : ''].filter(Boolean).join(' · ');
+        box.append(panelRow(main, sub, h.user_knows === 'no', mine(h.by), 'fa-circle-dot'));
+    }
+    for (const w of book?.control || []) {
+        box.append(panelRow(`${w.who.join(', ')}${w.by ? ` ← ${w.by}` : ''}${w.resists === 'yes' ? ' · resisting' : ''}`, [...w.set.map(x => `${x.kind} ${x.text}`), w.own ? `own: ${w.own}` : ''].filter(Boolean).join(' · '), w.user_knows === 'no', mine(w.by), 'fa-hand-sparkles'));
+    }
+    for (const e of book?.perception || []) {
+        const who = e.everyone ? `Everyone${e.except.length ? ` but ${e.except.join(', ')}` : ''}` : e.who.join(', ');
+        const main = e.kind === 'unseen' ? `${who} can't perceive ${e.target}` : `${who}: ${e.kind === 'false' ? 'believes' : 'takes as normal'}`;
+        box.append(panelRow(main, [e.what, e.by ? `by ${e.by}` : ''].filter(Boolean).join(' · '), e.user_knows === 'no', mine(e.by), 'fa-eye-slash'));
+    }
+    if (isEmptyBook(book)) {
+        box.append($('<div class="wh-empty"></div>').text(settings().ledger.enabled
+            ? 'Nothing yet. It fills in when someone is hypnotized, controlled, or has their perception changed. Tap ✏️ to add something yourself.'
+            : 'The Mind Book is off with the Body Ledger (Settings → Choices).'));
+    }
+}
+
+const textArea = (k, label, ph, value, cls = 'wh-full') => $(`<label class="wh-f ${cls}"></label>`)
+    .append($('<small></small>').text(label), $('<textarea class="text_pole" rows="2"></textarea>').attr({ 'data-k': k, placeholder: ph }).val(value || ''));
+const pick = (k, label, options, value) => $('<label class="wh-f"></label>')
+    .append($('<small></small>').text(label), $('<select class="text_pole"></select>').attr('data-k', k).append(options.map(o => $('<option></option>').val(o).text(o || '—'))).val(value || ''));
+const tick = (k, label, checked) => $('<label class="checkbox_label wh-full"></label>').append($(`<input type="checkbox" data-k="${k}">`).prop('checked', !!checked), $('<span></span>').text(label));
+
+async function openMindEditor() {
+    const c = ctx();
+    if (!c.chat?.length) { toastr.info('Open a chat first.'); return; }
+    const book = normalizeBook(headMind()?.book || EMPTY_BOOK);
+    const kinds = [...new Set([...mindKinds(), ...MIND_KINDS.filter(k => book[k].length)])];
+    if (!kinds.length) { toastr.info('Pick Hypnosis, Mind Control or Altered Perception for this character first.'); return; }
+    const root = $('<div class="wh-ledger-editor wh-mind-editor"></div>');
+    root.append('<h3>Mind Book</h3><small class="wh-muted">What mind-changing powers have put into people. Tap an entry to edit it; the next update builds on what you save.</small>');
+    const card = (title, fields, open) => {
+        const d = $('<details class="wh-body-card"></details>').prop('open', open);
+        const t = $('<span class="wh-body-title"></span>').text(title);
+        d.append($('<summary></summary>').append(t, delButton(() => d.remove())), $('<div class="wh-fields"></div>').append(fields));
+        return d;
+    };
+    const lists = {};
+    const section = (kind, title, make, blank) => {
+        root.append($('<div class="wh-mini-title"></div>').text(title));
+        const rows = $('<div class="wh-ledger-rows"></div>').attr('data-kind', kind);
+        book[kind].forEach(x => rows.append(make(x, false)));
+        root.append(rows, $('<div class="menu_button"></div>').text(`+ ${blank}`).on('click', () => rows.append(make({}, true))));
+        lists[kind] = rows;
+    };
+    if (kinds.includes('hypnosis')) section('hypnosis', 'Hypnosis', (h, open) => card(h.who || 'New subject', [
+        field('who', 'Who', 'who is hypnotized', h.who), field('by', 'By', 'who hypnotizes them', h.by),
+        pick('susceptibility', 'Susceptibility', ['', 'low', 'average', 'high'], h.susceptibility), pick('now', 'Right now', MIND_STAGES, h.now || 'awake'),
+        field('times', 'Times under', '0', String(h.times ?? '')), pick('deepest', 'Deepest so far', ['', ...MIND_STAGES.slice(1)], h.deepest),
+        textArea('suggestions', 'Suggestions, one per line: what it is | stage', 'finds Ash\'s voice calming | deep', (h.suggestions || []).map(x => `${x.text}${x.stage ? ` | ${x.stage}` : ''}${x.times > 1 ? ` | ${x.times}×` : ''}`).join('\n')),
+        textArea('triggers', 'Triggers, one per line: cue → effect', 'bloom → drops into a trance', (h.triggers || []).map(x => `${x.cue} → ${x.effect}`).join('\n')),
+        tick('amnesia', 'Told to forget the sessions', h.amnesia === 'yes'), tick('user_knows', 'You know about this', h.user_knows !== 'no'),
+    ], open), 'Subject');
+    if (kinds.includes('control')) section('control', 'Mind control', (w, open) => card(w.who?.length ? `${w.who.join(', ')}${w.by ? ` ← ${w.by}` : ''}` : 'New will', [
+        field('who', 'Who', 'one name, or several separated by commas', (w.who || []).join(', ')), field('by', 'Controller', 'who holds the control', w.by),
+        textArea('set', 'What was set, one per line: wants / feels / believes / loyal to / command: …', 'wants: to please Ash above everything', (w.set || []).map(x => `${x.kind}: ${x.text}`).join('\n')),
+        field('own', 'Still their own', 'what the control left alone, or "nothing: a blank drone"', w.own, 'wh-full'),
+        tick('resists', 'Aware of it and pushing against it', w.resists === 'yes'),
+        tick('user_knows', 'You know about this', w.user_knows !== 'no'),
+    ], open).attr('data-id', w.id || ''), 'Will');
+    if (kinds.includes('perception')) section('perception', 'Altered perception', (e, open) => card(e.what || 'New edit', [
+        field('what', 'The edit', 'one plain sentence', e.what, 'wh-full'),
+        pick('kind', 'Kind', ['unseen', 'normal', 'false'], e.kind || 'unseen'), field('target', "Can't perceive (unseen only)", 'who or what', e.target),
+        field('who', 'Who has it', 'names, separated by commas', (e.who || []).join(', ')), field('except', 'Except (with everyone)', 'names', (e.except || []).join(', ')),
+        tick('everyone', 'Everyone has it', e.everyone), field('by', 'Made by', 'who edited them', e.by),
+        tick('user_knows', 'You know about this', e.user_knows !== 'no'),
+    ], open).attr('data-id', e.id || ''), 'Edit');
+
+    const res = await c.callGenericPopup(root, c.POPUP_TYPE.CONFIRM, '', { wide: true, large: true, okButton: 'Save', cancelButton: 'Cancel' });
+    if (res !== c.POPUP_RESULT.AFFIRMATIVE) return;
+    const read = el => {
+        const o = { id: $(el).attr('data-id') || '' };
+        $(el).find('[data-k]').each((_, inp) => { o[$(inp).data('k')] = inp.type === 'checkbox' ? (inp.checked ? 'yes' : 'no') : String($(inp).val() || ''); });
+        return o;
+    };
+    const lines = s => String(s || '').split('\n').map(x => x.trim()).filter(Boolean);
+    const next = { ...book };
+    for (const kind of Object.keys(lists)) {
+        next[kind] = lists[kind].children('.wh-body-card').map((_, el) => {
+            const o = read(el);
+            if (kind === 'hypnosis') {
+                o.suggestions = lines(o.suggestions).map(l => { const [text, stage, n] = l.split('|').map(x => x.trim()); return { text, stage, times: parseInt(n, 10) || 1 }; });
+                o.triggers = lines(o.triggers).map(l => { const [cue, ...rest] = l.split(/\s*(?:→|->)\s*/); return { cue, effect: rest.join(' → ') }; });
+            }
+            if (kind === 'control') o.set = lines(o.set).map(l => { const m = l.match(/^\s*(wants|feels|believes|loyal to|command)\s*:\s*(.+)$/i); return m ? { kind: m[1].toLowerCase(), text: m[2] } : { kind: 'wants', text: l }; });
+            if (kind === 'perception') o.everyone = o.everyone === 'yes';
+            return o;
+        }).get();
+    }
+    storeMind(c.chat.length - 1, next);
+    await c.saveChat();
+    applyLedgerInjection();
+    renderMindPanel();
+    toastr.success('Mind Book saved.');
+}
+
+// ------------------------------------------------------------------ body checks
+
+function checksStatus(text) {
+    $('#wh_checks_status').text(text);
     console.log(LOG, text);
 }
 
@@ -914,123 +1149,84 @@ function lastReplyIndex() {
     return -1;
 }
 
-function editorContext(mesId) {
-    const chat = ctx().chat || [];
-    let userText = '';
-    const previous = [];
-    for (let i = mesId - 1; i >= 0 && (previous.length < 3 || !userText); i--) {
-        const m = chat[i];
-        if (!m || m.is_system) continue;
-        if (m.is_user) { if (!userText) userText = m.mes || ''; }
-        else if (previous.length < 3) previous.push(m.mes || '');
-    }
-    return { userText, previous };
-}
-
 function writeMessage(msg, text) {
     msg.mes = text;
     if (Array.isArray(msg.swipes) && typeof msg.swipe_id === 'number') msg.swipes[msg.swipe_id] = text;
 }
 
-function recordEdit(msg, rec) {
+// One record per reply, shared with the WH Editor: the text before anything changed it, and the text now. A second
+// pass on the same reply extends the record, so ⟲ still goes all the way back to the original.
+function recordEdit(msg, before, after, applied) {
+    const prev = msg.extra?.wh_edit;
+    const rec = prev && prev.edited === before
+        ? { original: prev.original, edited: after, applied: [...(prev.applied || []), ...applied], at: Date.now() }
+        : { original: before, edited: after, applied, at: Date.now() };
     msg.extra ??= {};
     msg.extra.wh_edit = rec;
     const info = msg.swipe_info?.[msg.swipe_id];
     if (info) { info.extra ??= {}; info.extra.wh_edit = rec; }
 }
 
-async function runEditor(mesId, type, { force = false } = {}) {
-    const s = settings().editor;
-    if (!force) {
-        if (!s.enabled) return;
-        if (['quiet', 'impersonate', 'first_message', 'command'].includes(type)) return;
-    }
-    const msg = ctx().chat?.[mesId];
-    if (!msg || msg.is_user || msg.is_system || !msg.mes) return;
-    const original = msg.mes;
-    if (!looksLikeRoleplay(original)) { status('Last reply looks like notes or out-of-story work; left alone.'); return; }
-
-    // Style fixes follow the "Chat Completion replies only" setting. The Ledger passes (pronouns, cuts) run on
-    // every reply whenever the Ledger has someone in another body, Text Completion replies included.
-    const styleFixes = force || !s.onlyChatCompletion || ctx().mainApi === 'openai';
+/**
+ * The Ledger's two checks on a reply, whenever it has someone in another body (Text Completion replies included):
+ * pronouns for a body and for the mind inside it, then cut-only body rules (bodies of one mind talking to each
+ * other, narration pointing at who is inside, anything that gives away a change the player doesn't know about).
+ * Both run on the Ledger's model. Returns the time taken in ms, or null when there was nothing to check.
+ */
+async function runBodyChecks(mesId) {
     const head = headLedger(mesId + 1);
-    const crossed = !!head && hasCrossedBodies(head.ledger);
-    if (!styleFixes && !crossed) return;
+    if (!head || !hasCrossedBodies(head.ledger)) return null;
+    const msg = ctx().chat?.[mesId];
+    if (!msg || msg.is_user || msg.is_system || !msg.mes || !looksLikeRoleplay(msg.mes)) return null;
+    // The WH Editor works on the same reply: let it finish first, so the two never edit it at once.
+    await new Promise(r => setTimeout(r, 0));
+    await globalThis.WHEditor?.whenDone?.(mesId);
 
     const t0 = performance.now();
+    const original = ctx().chat?.[mesId]?.mes;
+    if (!original) return null;
     let text = original;
     const applied = [];
-    let flagged = 0;
+    try {
+        const out = applyPronounFixes(text, parsePronounResponse(await askLedger(buildPronounMessages(text, head.ledger), 500, 0.1)), head.ledger);
+        text = out.text;
+        applied.push(...out.applied.map(a => ({ action: 'PRONOUN', ...a })));
+        if (out.rejected.length) console.debug(LOG, 'rejected pronoun fixes', out.rejected);
+    } catch { /* the cuts can still run */ }
+    try {
+        const out = applyCuts(text, parseLintResponse(await askLedger(buildLintMessages(text, head.ledger, ctx().name1 || 'User'), 500, 0.1)));
+        text = out.text;
+        applied.push(...out.applied);
+        if (out.rejected.length) console.debug(LOG, 'rejected cuts', out.rejected);
+    } catch { /* the pronoun fixes still stand */ }
 
-    // 0. pronoun hedges ("your — her — hand") collapse to the settled referent, no model needed
-    if (s.checks.hedges) {
-        const h = collapseHedges(text);
-        text = h.text;
-        applied.push(...h.applied);
-    }
-
-    // 1. rule pass + line fixes
-    const candidates = styleFixes ? detect(text, { ...s.checks, personal: s.personal, max: s.maxCandidates }, editorContext(mesId)) : [];
-    flagged = candidates.length;
-    if (candidates.length) {
-        try {
-            const out = applyEdits(text, candidates, parseEditorResponse(await askEditor(buildEditorMessages(text, candidates), s.maxTokens, s.temperature)), bannedPatterns(s.personal));
-            text = out.text;
-            applied.push(...out.applied);
-            if (out.rejected.length) console.debug(LOG, 'rejected rewrites', out.rejected);
-        } catch (err) {
-            status(`Editor: ${unreachable(s.profile)}.`);
-            return;
-        }
-    }
-
-    // 2. pronoun/name check against the Ledger (as of this reply)
-    if (s.pronouns && crossed) {
-        try {
-            const out = applyPronounFixes(text, parsePronounResponse(await askEditor(buildPronounMessages(text, head.ledger), 500, 0.1)), head.ledger);
-            text = out.text;
-            applied.push(...out.applied.map(a => ({ action: 'PRONOUN', ...a })));
-            if (out.rejected.length) console.debug(LOG, 'rejected pronoun fixes', out.rejected);
-        } catch { /* the line fixes still stand */ }
-    }
-
-    // 3. cut-only body-rule lint: bodies of one mind talking to each other, narration pointing at who is inside,
-    //    and anything that gives away a body change the player doesn't know about
-    if (s.lint && crossed) {
-        try {
-            const out = applyCuts(text, parseLintResponse(await askEditor(buildLintMessages(text, head.ledger, ctx().name1 || 'User'), 500, 0.1)));
-            text = out.text;
-            applied.push(...out.applied);
-            if (out.rejected.length) console.debug(LOG, 'rejected cuts', out.rejected);
-        } catch { /* earlier fixes still stand */ }
-    }
-
-    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    const ms = Math.round(performance.now() - t0);
     const now = ctx().chat?.[mesId];
-    if (!now || now.mes !== original) { status('Editor: the reply changed while it was being checked, so nothing was applied.'); return; }
-    if (!applied.length) { status(flagged ? `Last reply: ${flagged} flagged, all kept (${secs}s).` : 'Last reply: nothing flagged.'); return; }
+    if (!now || now.mes !== original) { checksStatus('Body checks: the reply changed while it was being checked, so nothing was applied.'); return ms; }
+    if (!applied.length) { checksStatus('Body checks: nothing to fix.'); return ms; }
     writeMessage(now, text);
-    recordEdit(now, { original, edited: text, applied, at: Date.now() });
+    recordEdit(now, original, text, applied);
     ctx().updateMessageBlock(mesId, now);
     markEdited(mesId);
     await ctx().saveChat();
-    status(`Last reply: ${applied.length} fix${applied.length > 1 ? 'es' : ''} (${secs}s). ⟲ in the message menu restores the original.`);
+    checksStatus(`Body checks: ${applied.length} fix${applied.length > 1 ? 'es' : ''}. ⟲ in the message menu restores the original.`);
     console.debug(LOG, 'applied', applied);
+    return ms;
 }
 
 async function toggleEdit(mesId) {
     const msg = ctx().chat?.[mesId];
     const rec = msg?.extra?.wh_edit;
-    if (!rec) { toastr.info('No Worldhopper Editor changes on this message.'); return; }
+    if (!rec) { toastr.info('No Worldhopper changes on this message.'); return; }
     let target;
     if (msg.mes === rec.edited) target = rec.original;
     else if (msg.mes === rec.original) target = rec.edited;
-    else { toastr.warning('This message was changed after the Editor ran, so it can’t be toggled.'); return; }
+    else { toastr.warning('This message was changed after it was fixed, so it can’t be toggled.'); return; }
     writeMessage(msg, target);
     ctx().updateMessageBlock(mesId, msg);
     markEdited(mesId);
     await ctx().saveChat();
-    toastr.success(target === rec.original ? 'Original reply restored.' : 'Editor fixes re-applied.');
+    toastr.success(target === rec.original ? 'Original reply restored.' : 'Fixes re-applied.');
 }
 
 function markEdited(mesId) {
@@ -1048,25 +1244,57 @@ function markAll() {
 let ledgerReady = Promise.resolve();
 const LEDGER_WAIT_MS = 8000;
 
+// What the Engine cost each turn, kept on the reply as extra.wh_timing so a slow turn can be traced afterwards:
+// wait = how long the reply waited for the Ledger before it was sent; ledger, checks = the work after it came back
+// (ms). The reply's own time is ST's gen_started → gen_finished, which includes the wait.
+let lastWait = 0;
+function noteTiming(mesId, timing) {
+    const msg = ctx().chat?.[mesId];
+    if (!msg) return;
+    msg.extra ??= {};
+    msg.extra.wh_timing = { ...msg.extra.wh_timing, ...timing };
+    const info = msg.swipe_info?.[msg.swipe_id];
+    if (info) { info.extra ??= {}; info.extra.wh_timing = msg.extra.wh_timing; }
+    const t = msg.extra.wh_timing, s = ms => `${(ms / 1000).toFixed(1)}s`;
+    const parts = [t.wait > 200 ? `waited ${s(t.wait)} for the Ledger` : '', t.ledger != null ? `Ledger ${s(t.ledger)}` : '', t.mind != null ? `Mind Book ${s(t.mind)}` : '', t.checks != null ? `body checks ${s(t.checks)}` : ''].filter(Boolean);
+    if (parts.length) $('#wh_turn_timing').text(`Last turn: ${parts.join(' · ')}`);
+}
+
 function onMessageReceived(mesId, type) {
-    if (['quiet', 'impersonate', 'command', 'first_message'].includes(type)) return;
+    if (!on() || ['quiet', 'impersonate', 'command', 'first_message'].includes(type)) return;
+    const wait = lastWait;
+    lastWait = 0;
+    const key = chatKey();
     let done;
     ledgerReady = new Promise(r => (done = r));
     enqueue(async () => {
         let ended = [];
+        const timing = { wait: Math.round(wait) };
         try {
             if (ledgerWanted() && !ledgerProfile()) ledgerStatus(`Ledger: ${unreachable('')}.`);
-            else if (ledgerWanted()) { setLedgerBusy(true); ended = (await updateLedger(mesId)).ended; }
+            else if (ledgerWanted()) {
+                setLedgerBusy(true);
+                const r = await updateLedger(mesId);
+                ended = r.ended;
+                if (r.ok) timing.ledger = r.ms;
+            }
+            if (mindWanted() && ledgerProfile()) {
+                const m = await updateMind(mesId);
+                if (m) timing.mind = m.ms;
+            }
         } finally {
             setLedgerBusy(false);
             done();
         }
-        await runEditor(mesId, type);
-        // After the Editor, so the reply is final and the fix you see isn't held up by it. A separate notes model
+        const checks = ledgerWanted() && ledgerProfile() ? await runBodyChecks(mesId) : null;
+        if (checks != null) timing.checks = checks;
+        await runMindCuts(mesId);
+        if (chatKey() === key) { noteTiming(mesId, timing); await ctx().saveChat(); }
+        // After the checks, so the reply is final and the fix you see isn't held up by it. A separate notes model
         // runs alongside the queue instead of holding up the next reply's Ledger; a shared one waits its turn.
-        if (ended.length && settings().ledger.history) {
+        if (ended.length) {
             const notes = noteEndedRides(mesId, ended).catch(err => console.warn(LOG, err));
-            if ([ledgerProfile(), settings().editor.profile].includes(notesProfile())) await notes;
+            if (notesProfile() === ledgerProfile()) await notes;
         }
     });
 }
@@ -1094,10 +1322,11 @@ function catchUpLedger() {
 }
 
 async function onGenerationStarted(type, _options, dryRun) {
-    if (!dryRun && type !== 'quiet') {
+    if (on() && !dryRun && type !== 'quiet') {
         const t0 = performance.now();
         await Promise.race([ledgerReady, new Promise(r => setTimeout(r, LEDGER_WAIT_MS))]);
         const waited = performance.now() - t0;
+        lastWait = waited;
         if (waited > 200) console.log(LOG, `waited ${(waited / 1000).toFixed(1)}s for the Ledger before generating`);
     }
     applyLedgerInjection(type);
@@ -1117,7 +1346,6 @@ function fillProfileSelect(id, value, emptyLabel) {
 function renderModelSelects() {
     const s = settings();
     fillProfileSelect('#wh_ledger_profile', s.ledger.profile, '— pick a profile —');
-    fillProfileSelect('#wh_editor_profile', s.editor.profile, '— pick a profile —');
     fillProfileSelect('#wh_ledger_notes_profile', s.ledger.notesProfile, 'Same as Ledger');
     $('#wh_no_profiles').toggle(!(ctx().extensionSettings.connectionManager?.profiles || []).length);
 }
@@ -1129,18 +1357,6 @@ function renderWorldSelect() {
     for (const n of names) sel.append($('<option></option>').val(n).text(n));
     if (s.world && !names.includes(s.world)) sel.append($('<option></option>').val(s.world).text(`${s.world} (not installed)`));
     sel.val(s.world);
-}
-
-function renderEditorPanel() {
-    const s = settings().editor;
-    renderModelSelects();
-    renderWorldSelect();
-    $('#wh_editor_enabled').prop('checked', s.enabled);
-    $('#wh_editor_cc_only').prop('checked', s.onlyChatCompletion);
-    $('#wh_editor_pronouns').prop('checked', s.pronouns);
-    $('#wh_editor_lint').prop('checked', s.lint);
-    $('#wh_editor_personal').val((s.personal || []).join('\n'));
-    for (const k of Object.keys(DEFAULTS.editor.checks)) $(`#wh_chk_${k}`).prop('checked', s.checks[k]);
 }
 
 async function addSettingsPanel() {
@@ -1168,21 +1384,16 @@ async function addSettingsPanel() {
         if (shown !== m) $(this).parent().after($('<div id="wh_codex_blurb" class="wh-blurb"></div>').data('mode', m).append($('<b></b>').text(m), `: ${MODE_BLURBS[m] || ''}`));
     });
 
-    bind('#wh_codex_enabled', () => s.codex.enabled, v => { settings().codex.enabled = v; renderCodexPanel(); });
-    bind('#wh_codex_anchors', () => s.codex.anchors, v => { settings().codex.anchors = v; });
-    bind('#wh_codex_details', () => s.codex.details, v => { settings().codex.details = v; });
+    // The heading's switch: a click on it mustn't also open or close the drawer it sits in.
+    $('.wh-power').on('click', e => e.stopPropagation());
+    bind('#wh_enabled', () => s.enabled, v => { settings().enabled = v; applyPower(); });
     bind('#wh_codex_initiative', () => s.codex.initiative, v => { settings().codex.initiative = v; });
-    bind('#wh_codex_suggest', () => s.codex.suggest, v => { settings().codex.suggest = v; });
     $('#wh_codex_modes').on('change', 'input[type="checkbox"]', onModeToggle);
     $('#wh_codex_suggest_now').on('click', () => enqueue(() => suggestModes({ force: true })));
     $('#wh_codex_edit').on('click', () => { pickerOpen = !$('#wh_codex_modes').is(':visible'); renderCodexPanel(); });
     $('#wh_codex_apply_suggestion').on('click', () => { const t = selectionTarget(); if (t) applySuggestion(t.key); });
 
     bind('#wh_ledger_enabled', () => s.ledger.enabled, v => { settings().ledger.enabled = v; applyLedgerInjection(); renderLedgerPanel(); });
-    bind('#wh_ledger_strip_on', () => s.ledger.strip, v => { settings().ledger.strip = v; renderStrip(); });
-    bind('#wh_ledger_badges_on', () => s.ledger.badges, v => { settings().ledger.badges = v; renderBadges(); });
-    bind('#wh_ledger_lanes_on', () => s.ledger.lanes, v => { settings().ledger.lanes = v; renderLanes(); });
-    bind('#wh_ledger_history_on', () => s.ledger.history, v => { settings().ledger.history = v; applyLedgerInjection(); renderLedgerPanel(); });
     $('#wh_ledger_backfill').on('click', backfillHistory);
     $('#wh_ledger_notes_profile').on('change', function () { settings().ledger.notesProfile = String($(this).val() || ''); save(); });
     $('#wh_ledger_profile').on('change', function () { settings().ledger.profile = String($(this).val() || ''); save(); });
@@ -1190,6 +1401,7 @@ async function addSettingsPanel() {
         .on('focus mousedown', () => { if ($('#wh_codex_world option').length !== (world_names?.length || 0)) renderWorldSelect(); });
     $('#wh_codex_update_now').on('click', () => syncCodexBook({ force: true }).catch(err => toastr.error(err.message)));
     $('#wh_ledger_open').on('click', openLedgerEditor);
+    $('#wh_mind_open').on('click', openMindEditor);
     $('#wh_ledger_rebuild').on('click', () => {
         const i = (ctx().chat?.length || 0) - 1;
         if (i < 0) return;
@@ -1197,28 +1409,46 @@ async function addSettingsPanel() {
         enqueue(() => updateLedger(i, { rebuild: true }));
     });
 
-    bind('#wh_editor_enabled', () => s.editor.enabled, v => { settings().editor.enabled = v; });
-    bind('#wh_editor_cc_only', () => s.editor.onlyChatCompletion, v => { settings().editor.onlyChatCompletion = v; });
-    bind('#wh_editor_pronouns', () => s.editor.pronouns, v => { settings().editor.pronouns = v; });
-    bind('#wh_editor_lint', () => s.editor.lint, v => { settings().editor.lint = v; });
-    $('#wh_editor_personal').on('change', function () { settings().editor.personal = String($(this).val() || '').split('\n').map(x => x.trim()).filter(Boolean); save(); });
-    $('#wh_editor_profile').on('change', function () { settings().editor.profile = String($(this).val() || ''); save(); });
-    for (const k of Object.keys(DEFAULTS.editor.checks)) {
-        bind(`#wh_chk_${k}`, () => s.editor.checks[k], v => { settings().editor.checks[k] = v; });
-    }
-    $('#wh_editor_run').on('click', () => { const i = lastReplyIndex(); if (i >= 0) enqueue(() => runEditor(i, 'manual', { force: true })); });
-
+    renderModelSelects();
+    renderWorldSelect();
     renderCodexPanel();
     renderLedgerPanel();
-    renderEditorPanel();
+    applyPower();
+}
+
+/** Show the panel for Worldhopper on or off, and take its prompts out (or put them back) right away. */
+function applyPower() {
+    const live = on();
+    $('#wh_enabled').prop('checked', live);
+    $('#wh_off_note').toggle(!live);
+    $('.worldhopper-settings .wh-body > .wh-card, .worldhopper-settings .wh-body > .wh-status').toggle(live);
+    applyLedgerInjection();
+    renderCodexPanel();
+    renderLedgerPanel();
+    renderLanes();
+    if (live) catchUpLedger();
 }
 
 function addMessageButton() {
-    const btn = '<div title="Worldhopper Editor: toggle original / fixed" class="mes_button wh-undo fa-solid fa-rotate-left"></div>';
-    $('#message_template .mes_buttons .extraMesButtons').prepend(btn);
+    // The WH Editor adds the same button: whichever loads first adds it, and only one click handler is bound.
+    if (!$('#message_template .wh-undo').length) {
+        $('#message_template .mes_buttons .extraMesButtons').prepend('<div title="Worldhopper: toggle original / fixed" class="mes_button wh-undo fa-solid fa-rotate-left"></div>');
+    }
+    if (globalThis.whUndoBound) return;
+    globalThis.whUndoBound = true;
     $(document).on('click', '.wh-undo', function () {
         toggleEdit(Number($(this).closest('.mes').attr('mesid')));
     });
+}
+
+// The style Editor used to be part of the Engine. Anyone who had it on hears once where it went.
+function noteEditorMoved() {
+    const s = settings();
+    if (s.editorMovedNoted || !s.editor || s.editor.enabled === false || globalThis.WHEditor) return;
+    s.editorMovedNoted = true;
+    save();
+    toastr.info('The Editor is its own extension now: install <b>WH Editor</b> to keep its line fixes. Your settings and slop list carry over.',
+        'Worldhopper', { timeOut: 0, extendedTimeOut: 0, escapeHtml: false, onclick: () => window.open('https://github.com/Coz-rp/SillyTavern-WH-Editor', '_blank') });
 }
 
 function addWandButton() {
@@ -1443,16 +1673,6 @@ async function powerShutdown() {
 function addSlashCommands() {
     const { SlashCommandParser, SlashCommand, SlashCommandArgument, ARGUMENT_TYPE } = ctx();
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'wh-edit',
-        callback: async (_args, value) => {
-            const id = String(value ?? '').trim() ? Number(value) : lastReplyIndex();
-            await enqueue(() => runEditor(id, 'manual', { force: true }));
-            return '';
-        },
-        unnamedArgumentList: [SlashCommandArgument.fromProps({ description: 'message id (default: the last reply)', typeList: [ARGUMENT_TYPE.NUMBER], isRequired: false })],
-        helpString: 'Run the Worldhopper Editor on a message now, even if auto-editing is off.',
-    }));
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'wh-modes',
         callback: async (_args, value) => {
             const v = String(value ?? '').trim();
@@ -1467,6 +1687,16 @@ function addSlashCommands() {
         },
         unnamedArgumentList: [SlashCommandArgument.fromProps({ description: 'comma-separated modes, or "none"; omit to show the current picks', typeList: [ARGUMENT_TYPE.STRING], isRequired: false })],
         helpString: 'Show or set the Worldhopper Codex modes for the current character or group, e.g. /wh-modes Possession, Skinsuit',
+    }));
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'wh-mind',
+        callback: async (_args, value) => {
+            if (String(value ?? '').trim().toLowerCase() === 'edit') { await openMindEditor(); return ''; }
+            const head = headMind();
+            return head ? renderMindBook(head.book, ctx().name1 || 'User', { kinds: MIND_KINDS }) || 'empty' : 'no Mind Book yet';
+        },
+        unnamedArgumentList: [SlashCommandArgument.fromProps({ description: '"edit" to open the editor; omit to show the Mind Book', typeList: [ARGUMENT_TYPE.STRING], isRequired: false })],
+        helpString: 'Show the Mind Book (what Hypnosis, Mind Control and Altered Perception have put into people), or open its editor (/wh-mind edit).',
     }));
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'wh-ledger',
@@ -1499,7 +1729,7 @@ jQuery(async () => {
         eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
         eventSource.on(event_types.CHAT_CHANGED, () => {
             pickerOpen = null;
-            renderCodexPanel(); renderLedgerPanel(); renderEditorPanel(); applyLedgerInjection();
+            renderCodexPanel(); renderLedgerPanel(); renderModelSelects(); renderWorldSelect(); applyLedgerInjection();
             setTimeout(markAll, 0);
             catchUpLedger();
             enqueue(() => suggestModes());
@@ -1511,6 +1741,7 @@ jQuery(async () => {
         // The lorebook list is known once the app is ready (fires at once if it already is).
         eventSource.on(event_types.APP_READY, () => syncCodexBook().catch(err => console.warn(LOG, 'Codex install', err)));
         eventSource.on(event_types.APP_READY, () => { try { syncDisplayScripts(); } catch (err) { console.warn(LOG, 'display scripts', err); } });
+        eventSource.on(event_types.APP_READY, noteEditorMoved);
         if (event_types.WORLDINFO_SETTINGS_UPDATED) eventSource.on(event_types.WORLDINFO_SETTINGS_UPDATED, () => { renderWorldSelect(); renderCodexPanel(); });
         for (const ev of [event_types.CHARACTER_MESSAGE_RENDERED, event_types.MESSAGE_UPDATED, event_types.MESSAGE_SWIPED]) {
             if (ev) eventSource.on(ev, (id) => setTimeout(() => markEdited(Number(id)), 0));
