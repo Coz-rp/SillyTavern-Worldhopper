@@ -19,8 +19,8 @@ import { loadWorldInfo, saveWorldInfo, updateWorldInfoList, world_names } from '
 import { looksLikeRoleplay } from './text-core.js';
 import { MODE_GROUPS, MODIFIERS, PARENT, ALL_MODES, MODE_BLURBS, expandModes, planEntry, buildSuggestMessages, parseSuggestResponse, DISPLAY_SCRIPTS } from './codex-core.js';
 import {
-    EMPTY_LEDGER, normalizeLedger, isEmptyLedger, buildLedgerMessages, parseLedger, parseLedgerUpdate, verifyNewRides, verifyEndedRides, renderLedger, akaOf, aliasResolver,
-    labelMultiRides, rosterOf, tracksBodies, LEDGER_MODES,
+    EMPTY_LEDGER, normalizeLedger, buildLedgerMessages, parseLedger, parseLedgerUpdate, verifyNewRides, verifyEndedRides, renderLedger, akaOf, aliasResolver,
+    labelMultiRides, rosterOf, tracksBodies,
     hasCrossedBodies, buildPronounMessages, parsePronounResponse, applyPronounFixes, buildLintMessages, parseLintResponse, applyCuts,
     endedRides, bodyHistory, renderHistory, historyGroups, buildHistoryMessages, parseHistoryResponse,
 } from './ledger-core.js';
@@ -366,11 +366,13 @@ function headLedger(beforeIndex) {
     return base ? { ledger: normalizeLedger(base), index: -1 } : null;
 }
 
-// The Ledger only runs where a mind inhabits another body (LEDGER_MODES). Every other mode gives it nothing to track,
-// so with only those picked it stays off rather than spending a model call on every reply.
+// The Ledger only comes in where a mind inhabits another body (LEDGER_MODES): it runs, goes into the prompt and shows
+// in the panel, strip and roster only while one of those modes is picked, the way the Mind Book comes in only with
+// its own modes. Mind changes (hypnosis, mind control, altered perception) belong to the Mind Book, so a chat with
+// only those never runs the Ledger, even if it holds Ledger entries from before; they stay for when a body mode is on.
+const bodyModes = () => tracksBodies([...expandModes(currentModes())]);
 function ledgerWanted() {
-    if (!on() || !settings().ledger.enabled) return false;
-    return tracksBodies([...expandModes(currentModes())]) || !isEmptyLedger(headLedger()?.ledger);
+    return on() && settings().ledger.enabled && bodyModes();
 }
 
 function storeLedger(mesId, ledger) {
@@ -563,9 +565,10 @@ function applyLedgerInjection(type) {
     // GENERATION_STARTED; MESSAGE_SENT runs this again once it's there.)
     let lastUserText = '';
     for (let i = limit - 1; i >= 0; i--) if (chat[i]?.is_user) { lastUserText = chat[i].mes; break; }
-    const text = head ? renderLedger(head.ledger, c.name1 || 'User', { lastUserText }) : '';
+    const bodies = ledgerWanted();
+    const text = bodies && head ? renderLedger(head.ledger, c.name1 || 'User', { lastUserText }) : '';
     c.setExtensionPrompt(LEDGER_KEY, text, IN_CHAT, 1, false, SYSTEM);
-    c.setExtensionPrompt(HISTORY_KEY, historyText(limit), IN_CHAT, HISTORY_DEPTH, false, SYSTEM);
+    c.setExtensionPrompt(HISTORY_KEY, bodies ? historyText(limit) : '', IN_CHAT, HISTORY_DEPTH, false, SYSTEM);
     // The Mind Book, with the watcher lines for the reply about to be written: your newest message, and the scene
     // as the last two messages leave it.
     const kinds = mindKinds();
@@ -592,6 +595,7 @@ function panelRow(main, sub, hidden, kind = '', icon = '') {
 
 function renderLedgerPanel() {
     renderMindPanel();
+    $('#wh_ledger_card').toggle(on() && bodyModes());
     const ledger = headLedger()?.ledger;
     const box = $('#wh_ledger_summary').empty();
     const canon = aliasResolver(ledger);
@@ -610,10 +614,7 @@ function renderLedgerPanel() {
     ].filter(Boolean);
     for (const x of extra) box.append($('<div class="wh-row-sub wh-extra"></div>').text(x));
     if (!ledger?.bodies?.length) {
-        const modes = currentModes();
-        const idle = modes.length && !tracksBodies([...expandModes(modes)]);
-        box.prepend($('<div class="wh-empty"></div>').text(idle ? `The Ledger tracks who is in which body, so it stays off with ${modes.join(', ')}. It runs with ${LEDGER_MODES.filter(m => !['Copy Fidelity', 'Reverse Vore'].includes(m)).join(', ')}.`
-            : ledgerWanted() ? 'Everyone is in their own body.' : 'Starts once this chat has a mode where someone inhabits another body.'));
+        box.prepend($('<div class="wh-empty"></div>').text(ledgerWanted() ? 'Everyone is in their own body.' : 'Off: switch on Body Ledger & Mind Book under Settings → Choices.'));
     }
 
     const hist = $('#wh_ledger_history').empty();
@@ -646,11 +647,10 @@ function ensureStrips() {
 
 function renderStrip() {
     ensureStrips();
-    const s = settings().ledger;
     const ledger = headLedger()?.ledger;
     const bodies = ledger?.bodies || [];
     // The roster goes with it: a chat with no bodies must not keep the last chat's cards over the message box.
-    if (!on() || !s.enabled || !ctx().chat?.length || (!bodies.length && !ledgerBusy)) { $('#wh_ledger_strip').hide(); renderLanes(); return; }
+    if (!ledgerWanted() || !ctx().chat?.length || (!bodies.length && !ledgerBusy)) { $('#wh_ledger_strip').hide(); renderLanes(); return; }
     const canon = aliasResolver(ledger);
     const me = canon(ctx().name1 || '');
     const chip = (kind, icon, title, sub, tip, hidden) => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}" title="${esc(tip)}"><i class="fa-solid ${icon} wh-chip-icon"></i>`
@@ -715,7 +715,7 @@ function renderLanes() {
         $('#send_textarea').on('input click keyup focus', markLanes);
     }
     const s = settings().ledger;
-    const ledger = on() && s.enabled ? headLedger()?.ledger : null;
+    const ledger = ledgerWanted() ? headLedger()?.ledger : null;
     const roster = ledger ? rosterOf(ledger, ctx().name1 || '') : [];
     if (!roster.length) { $('#wh_lanes').hide().empty(); return; }
     const big = roster.length > 6;
@@ -1029,7 +1029,7 @@ function renderMindPanel() {
     const kinds = mindKinds();
     const head = headMind();
     const book = head?.book;
-    const show = on() && (kinds.length > 0 || !isEmptyBook(book));
+    const show = on() && kinds.length > 0;
     $('#wh_mind_card').toggle(show);
     if (!show) return;
     const box = $('#wh_mind_summary').empty();
@@ -1256,7 +1256,7 @@ function noteTiming(mesId, timing) {
     const info = msg.swipe_info?.[msg.swipe_id];
     if (info) { info.extra ??= {}; info.extra.wh_timing = msg.extra.wh_timing; }
     const t = msg.extra.wh_timing, s = ms => `${(ms / 1000).toFixed(1)}s`;
-    const parts = [t.wait > 200 ? `waited ${s(t.wait)} for the Ledger` : '', t.ledger != null ? `Ledger ${s(t.ledger)}` : '', t.mind != null ? `Mind Book ${s(t.mind)}` : '', t.checks != null ? `body checks ${s(t.checks)}` : ''].filter(Boolean);
+    const parts = [t.wait > 200 ? `waited ${s(t.wait)} for the ${t.ledger != null ? 'Ledger' : 'Mind Book'}` : '', t.ledger != null ? `Ledger ${s(t.ledger)}` : '', t.mind != null ? `Mind Book ${s(t.mind)}` : '', t.checks != null ? `body checks ${s(t.checks)}` : ''].filter(Boolean);
     if (parts.length) $('#wh_turn_timing').text(`Last turn: ${parts.join(' · ')}`);
 }
 

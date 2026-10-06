@@ -30,7 +30,7 @@
                 <div id="wh_codex_modes" class="wh-modes" style="display:none"></div>
             </section>
 
-            <section class="wh-card">
+            <section id="wh_ledger_card" class="wh-card" style="display:none">
                 <div class="wh-head">
                     <span class="wh-title"><i class="fa-solid fa-people-arrows wh-title-icon"></i>Body Ledger</span>
                     <div class="wh-tools">
@@ -40,7 +40,7 @@
                     </div>
                 </div>
                 <div class="wh-help" data-help="ledger">
-                    Keeps track of who is in which body (possession, multipossession, skinsuits, hive minds, copies) and who has which power. It updates after each reply in chats with one of those modes, and goes into the prompt so names, pronouns and every change stay straight. <span class="wh-key wh-key-you"></span> teal rows are yours; <span class="wh-key wh-key-npc"></span> violet rows are someone else's. Mind changes like hypnosis and mind control are left to the Codex, so with only those modes it stays off.
+                    Keeps track of who is in which body (possession, multipossession, skinsuits, hive minds, copies) and who has which power. It updates after each reply in chats with one of those modes, and goes into the prompt so names, pronouns and every change stay straight. <span class="wh-key wh-key-you"></span> teal rows are yours; <span class="wh-key wh-key-npc"></span> violet rows are someone else's. Mind changes like hypnosis and mind control belong to the Mind Book, so the Ledger only comes in with a body mode, and it shows here only then.
                     After each reply it reads only the newest messages, never the whole chat.
                     While you run more than one body, a card per body sits over the message box: tap one to start a line like <code>[Kayla] </code> for that body. A line with no name is you as a whole, and the writer only ever does what you wrote with your bodies.
                     <br><i class="fa-solid fa-pen"></i> fixes a mistake (the next update builds on your fix) · <i class="fa-solid fa-rotate"></i> rebuilds it from the card and the last few messages · tap a row to see its details.

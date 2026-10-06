@@ -112,7 +112,7 @@ A mode is one kind of metaphysics, with its own rules: how it's done, what the s
 
 ## 📒 Body Ledger
 
-The Ledger is for the modes where one mind lives in another's body: Possession, Multipossession, Skinsuit, Hive Mind, Reverse Vore, Propagation and Copy Fidelity. In a chat with none of those it stays off. After each reply, a model you choose reads the newest messages and updates a record of:
+The Ledger is for the modes where one mind lives in another's body: Possession, Multipossession, Skinsuit, Hive Mind, Reverse Vore, Propagation and Copy Fidelity. In a chat with none of those it stays out entirely, even if the chat holds Ledger entries from before: it doesn't run, doesn't go into the prompt and doesn't show, so a hypnosis or mind control chat is the Mind Book's alone. Pick one of those modes and the Ledger comes back as it was. After each reply, a model you choose reads the newest messages and updates a record of:
 
 - 🧍 **Bodies** that aren't driven by their own mind: possessed, worn as a skin, absorbed into a hive, overwritten by a copy, swapped. Also empty bodies, and minds with no body.
 - ⚡ **Powers**: who can do what, even when nobody is using it.
