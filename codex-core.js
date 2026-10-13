@@ -15,11 +15,15 @@ export const PARENT = { 'Multipossession': 'Possession', 'Copy Fidelity': 'Propa
 export const MODIFIERS = new Set(['Multipossession', 'Copy Fidelity', 'Reverse Vore']);
 const OCCUPANCY_BASE = ['Possession', 'Propagation', 'Puppetry', 'Skinsuit', 'Hive Mind'];
 
+// Each anchor comes in with its mode, or with any of a list of modes.
 export const ANCHOR_FOR = {
     '⛓ Multi Anchor': 'Multipossession',
     '⛓ Propagation Anchor': 'Propagation',
     '⛓ Puppetry Anchor': 'Puppetry',
     '⛓ Skinsuit Anchor': 'Skinsuit',
+    // A body's name and pronouns apart from the mind driving it: every mode where a mind drives someone else's body
+    // (Multipossession and Reverse Vore bring in Possession).
+    '⛓ Referent Anchor': ['Possession', 'Skinsuit', 'Hive Mind', 'Puppetry'],
 };
 
 export const ALL_MODES = MODE_GROUPS.flatMap(([, modes]) => modes);
@@ -34,7 +38,7 @@ export const MODE_BLURBS = {
     'Skinsuit': "a host's hollow skin is worn from within like a garment",
     'Hive Mind': 'minds absorbed into a single network that is the original mind',
     'Reverse Vore': 'entry by being swallowed, then control seized from inside',
-    'Hypnosis': 'realistic trances that deepen in stages over sessions, with suggestions sincerely rationalised as the subject\'s own',
+    'Hypnosis': 'realistic trances that deepen in stages over sessions, with suggestions sincerely rationalized as the subject\'s own',
     'Mind Control': "the mind itself taken over: wants, feelings and beliefs set by the controller and felt as the subject's own",
     'Altered Perception': 'premises edited so the altered normal is defended as always true',
     'Blank Slate': 'a mind wiped to a genuine void',
@@ -85,7 +89,7 @@ export function planEntry(title, active, { anchors = true, details = true, initi
     if (t === '👁 Metaphysics Core') return 'constant';
     if (t === '⛓ Initiative Anchor') return initiative ? 'constant' : null;
     if (t.startsWith('👁 ')) return active.has(t.slice(2).trim()) ? 'constant' : null;
-    if (t.startsWith('⛓ ')) return anchors && active.has(ANCHOR_FOR[t]) ? 'constant' : null;
+    if (t.startsWith('⛓ ')) return anchors && [ANCHOR_FOR[t]].flat().some(m => active.has(m)) ? 'constant' : null;
     if (t.startsWith('📖 ')) {
         const mode = t.slice(2).split(' · ')[0].trim();
         return details && active.has(mode) ? 'keyed' : null;
@@ -104,7 +108,7 @@ export const DISPLAY_SCRIPTS = [
     { id: 'wh-moments', scriptName: 'WH - Moments', findRegex: `/%%(${MOMENTS.join('|')})%%[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*%%\\/\\1%%/gi`, replaceString: '<div class="wh-moment wh-m-$1" markdown="1">\n$2\n</div>' },
     // A marker whose partner went missing would otherwise show as raw text. Must run after the box scripts.
     { id: 'wh-stray-markers', scriptName: 'WH - Stray markers', findRegex: `/^[ \\t]*%%\\/?(?:possession|release|${MOMENTS.join('|')})%%[ \\t]*\\n?/gim`, replaceString: '' },
-    // Your lines for one body ("[Kayla] takes the keys", from the body buttons) as labelled rows; your messages only.
+    // Your lines for one body ("[Kayla] takes the keys", from the body buttons) as labeled rows; your messages only.
     // [OOC …] and anything with a colon inside the brackets stay as typed.
     { id: 'wh-body-lines', scriptName: 'WH - Body lines', findRegex: '/^[ \\t]*\\[(?!ooc\\b)([^\\[\\]\\n:]{1,40})\\][ \\t]*(\\S.*)$/gim', replaceString: '\n<div class="wh-lane" markdown="1">\n<span class="wh-lane-name">$1</span> $2\n</div>\n', placement: [1] },
 ].map(s => ({ trimStrings: [], placement: [1, 2], disabled: false, markdownOnly: true, promptOnly: false, runOnEdit: true, substituteRegex: 0, minDepth: null, maxDepth: null, ...s }));

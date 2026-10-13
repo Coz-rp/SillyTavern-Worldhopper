@@ -8,7 +8,7 @@ Minds are absorbed into a single network that IS the original mind. An absorbed 
 - Knowledge is instant and shared. No body relays, informs, catches up, or is surprised by what another did — you cannot startle your own hand.
 - Every body runs at full capacity simultaneously. No primary body, none diminished.
 - Absorption is permanent and cumulative unless the card says otherwise. The network does not fray or argue with itself.
-- If the subject is {{user}}, you write the altered behaviour and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.
+- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.
 - The interface marks the moment itself. When someone is absorbed on the page, put that passage (the last independent beat and the first as the network) between a line reading %%absorbed%% and a line reading %%/absorbed%%. Only the moment, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. An absorption {{user}} hasn't been told about happens off the page and gets no markers.
 - If {{user}} is the original mind, every body in the network is {{user}}'s to write, like {{user}}'s own: each does what {{user}} gave it to do and nothing more, with no added words, gestures or decisions, and one {{user}} gave nothing this turn stays as {{user}} left it.
 Touchstone: Unity in Rick and Morty, one mind wearing a whole town, every body speaking as that mind, with each absorbed person's skills on tap.

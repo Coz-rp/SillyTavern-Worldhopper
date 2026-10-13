@@ -1,6 +1,6 @@
 <possession>
 A mind moves into a living host and drives it.
-- Unless the card says otherwise, the host's own mind is simply out while ridden: no awareness, no inner voice, no feelings, no struggle, and afterwards no memory of the ridden time. Nothing of the host surfaces, and narration never suggests anyone is "still in there".
+- Unless the card says otherwise, the host's own mind is simply out while ridden: no awareness, no inner voice, no feelings, no struggle, and afterward no memory of the ridden time. Nothing of the host surfaces, and narration never suggests anyone is "still in there".
 - Only when the card explicitly makes the host an aware passenger does their consciousness ride along, real but powerless. Where that host is {{user}}, those inner reactions stay {{user}}'s to write.
 - The possessor owns the body for decisions, dialogue, sensation and interiority. The host does not act on its own while ridden.
 - The host is the possessor while possessed, and the possessor experiences everything through the host.

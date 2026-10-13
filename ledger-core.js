@@ -337,11 +337,11 @@ export function buildRideCheckMessages(ride, messages, context = [], userName = 
 const MULTI_MODES = ['Multipossession', 'Hive Mind', 'Propagation', 'Puppetry'];
 export const isSingleBody = (modes = []) => modes.length > 0 && !modes.some(m => MULTI_MODES.includes(m));
 // Modes where the mind's own body stays one of the set. (A Multipossession chat had the player's body "go slack",
-// and the ledger, labelling the ride plain "possession", had no way to say otherwise.)
+// and the ledger, labeling the ride plain "possession", had no way to say otherwise.)
 const KEEPS_OWN_BODY = ['Multipossession', 'Hive Mind'];
 
 /**
- * A ride the model labelled plain "possession" is a multipossession when that mode is on, and a hive mind in a story
+ * A ride the model labeled plain "possession" is a multipossession when that mode is on, and a hive mind in a story
  * whose only occupancy mode is Hive Mind. The label is what tells the rest of the ledger the mind kept its own body.
  */
 export function labelMultiRides(ledger, modes = []) {
@@ -660,7 +660,7 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' 
     }
     for (const b of hidden) {
         const her = (b.pronouns.split('/')[0] || 'they').toLowerCase();
-        rules.push(`${userName} doesn't know that ${b.body} is ${b.driver}. In narration ${her === 'they' ? 'they are' : `${her} is`} only ${b.body}, with ${b.body}'s own name and pronouns, and nothing mentions, hints at, or explains that anyone else is inside. ${b.driver}'s habits may show in what ${b.body} does, written as ${b.body}'s own behaviour; only what ${userName} could actually notice reaches the page.`);
+        rules.push(`${userName} doesn't know that ${b.body} is ${b.driver}. In narration ${her === 'they' ? 'they are' : `${her} is`} only ${b.body}, with ${b.body}'s own name and pronouns, and nothing mentions, hints at, or explains that anyone else is inside. ${b.driver}'s habits may show in what ${b.body} does, written as ${b.body}'s own behavior; only what ${userName} could actually notice reaches the page.`);
     }
     const powers = l.powers.map(p => `${p.who}: ${p.power}`).join('; ');
     const aliases = l.aliases.map(a => `${a.name} = ${a.aka.join(' = ')}`).join('; ');
@@ -668,7 +668,7 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' 
     return [
         '<body_ledger>',
         ...(hasBodies ? [
-            `Who is in which body right now. Where ${userName} knows, everything the world sees of a body uses that body's own name and pronouns, and anything about the mind inside it (what it wants, decides, thinks, or is) uses the mind's own name and pronouns. Either way, that mind's habits show as the body's own behaviour, written plainly, with no narration pointing out who is inside.`,
+            `Who is in which body right now. Where ${userName} knows, everything the world sees of a body uses that body's own name and pronouns, and anything about the mind inside it (what it wants, decides, thinks, or is) uses the mind's own name and pronouns. Either way, that mind's habits show as the body's own behavior, written plainly, with no narration pointing out who is inside.`,
             ...lines,
             `Everyone else, ${userName} included unless listed, is in their own body.`,
         ] : []),
@@ -864,7 +864,7 @@ export function applyPronounFixes(text, pairs, ledger) {
         for (let i = 0; i < tb.length; i++) {
             if (tb[i] === tf[i]) continue;
             if (swappable(tb[i]) && swappable(tf[i])) { changed++; continue; }
-            if (tb[i].toLowerCase() === tf[i].toLowerCase()) continue; // capitalisation only
+            if (tb[i].toLowerCase() === tf[i].toLowerCase()) continue; // capitalization only
             ok = false; break;
         }
         if (!ok || !changed) { rejected.push({ bad: b, fix: f, why: ok ? 'no pronoun or name changed' : 'changed more than pronouns/names' }); continue; }

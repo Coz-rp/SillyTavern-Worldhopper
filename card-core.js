@@ -1,5 +1,5 @@
 // Worldhopper Engine — card tools. Pure functions (no SillyTavern imports).
-//   Make card:   read the labelled blocks a card-builder chat produced ("--- DESCRIPTION (→ "Description") ---" …),
+//   Make card:   read the labeled blocks a card-builder chat produced ("--- DESCRIPTION (→ "Description") ---" …),
 //                latest version of each winning, and assemble a Character Card V2 with its Codex modes.
 //   Card Doctor: checks a card against how SillyTavern, the Codex and a typical preset will actually use it.
 
@@ -39,7 +39,7 @@ function cleanBlock(lines) {
 }
 
 /**
- * Pull every labelled block out of the builder's replies, oldest first, so a later version of a piece replaces an
+ * Pull every labeled block out of the builder's replies, oldest first, so a later version of a piece replaces an
  * earlier one. @param {{text:string, is_user?:boolean}[]} messages
  */
 export function parseBuilderChat(messages) {
@@ -245,7 +245,7 @@ export function doctorCard(d, { userNames = [], modes = [], tool = false, always
     }
     const pointer = findHit(/(borrowed (body|face|mouth|hands?|eyes)|someone else'?s (eyes|smile|voice|mouth)|(his|her|their) smile on (her|his|their) (face|mouth)|something behind (her|his|their) eyes|a smile that isn'?t (hers|his|theirs))/i, scene);
     if (pointer) {
-        warn('Possession pointers in the greetings', 'The opening narration points out who is inside ("borrowed body", "his smile on her face"). The model copies the first message\'s style, so it will keep doing it. Write the habits as the body\'s own behaviour.', pointer);
+        warn('Possession pointers in the greetings', 'The opening narration points out who is inside ("borrowed body", "his smile on her face"). The model copies the first message\'s style, so it will keep doing it. Write the habits as the body\'s own behavior.', pointer);
     }
     // School and small-body wording with no age anywhere leaves a model unsure everyone is an adult, which is where it
     // starts hedging or refusing. An age in the card or its lorebook settles it.

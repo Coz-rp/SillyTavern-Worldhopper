@@ -15,6 +15,7 @@
 // Each background job runs through a connection profile picked under Settings → Models.
 import { ConnectionManagerRequestService } from '../../shared.js';
 import { getPresetManager } from '../../../preset-manager.js';
+import { promptManager } from '../../../openai.js';
 import { loadWorldInfo, saveWorldInfo, updateWorldInfoList, world_names } from '../../../world-info.js';
 import { looksLikeRoleplay } from './text-core.js';
 import { MODE_GROUPS, MODIFIERS, PARENT, ALL_MODES, MODE_BLURBS, expandModes, planEntry, buildSuggestMessages, parseSuggestResponse, DISPLAY_SCRIPTS } from './codex-core.js';
@@ -42,7 +43,7 @@ const DEFAULTS = {
     enabled: true,
     codex: { world: 'WH Metaphysics', initiative: true, selections: {}, suggested: {}, installedHash: '' },
     // Connection profiles, picked under Settings → Models. The Ledger runs after every reply, so a fast model suits
-    // it; history notes need judgement about who remembers what, so a stronger model suits them.
+    // it; history notes need judgment about who remembers what, so a stronger model suits them.
     ledger: { enabled: true, lanesCompact: false, profile: '', notesProfile: '' },
 };
 
@@ -99,7 +100,7 @@ async function askProfile(name, messages, maxTokens, temperature, { signal = nul
     const custom = { stream: false, extractData: true, includePreset: true, includeInstruct: true, signal };
     const inst = profile.instruct ? getPresetManager('instruct')?.getCompletionPresetByName(profile.instruct) : null;
     if (inst?.last_output_sequence) custom.instructSettings = { last_system_sequence: inst.last_output_sequence };
-    // DRY off: an RP preset often uses it, and it penalises exactly what these jobs need — copying a sentence or
+    // DRY off: an RP preset often uses it, and it penalizes exactly what these jobs need — copying a sentence or
     // the previous ledger verbatim. With DRY on, the model paraphrases the text it is told to quote, and every
     // guarded fix gets rejected.
     const res = await ConnectionManagerRequestService.sendRequest(profile.id, messages, maxTokens, custom, { temperature, dry_multiplier: 0 });
@@ -301,7 +302,7 @@ function applySuggestion(key) {
 
 // The full picker stays folded away once a card has its modes; it opens by itself for a card with none.
 let pickerOpen = null;
-// Each mode's family ("occupancy", "overwrite"…), for its chip colour.
+// Each mode's family ("occupancy", "overwrite"…), for its chip color.
 const groupOf = m => (MODE_GROUPS.find(([, list]) => list.includes(m))?.[0] || 'other').toLowerCase();
 
 function renderCodexPanel() {
@@ -344,6 +345,36 @@ function renderCodexPanel() {
     const showSug = t && on() && !picked.size && Array.isArray(sug) && sug.length;
     $('#wh_codex_suggestion').toggle(!!showSug);
     $('#wh_codex_suggestion_text').text(showSug ? `Suggested: ${sug.join(', ')}` : '');
+    renderPresetNudge();
+}
+
+// The Worldhopper presets' optional metaphysics block (a bodies-and-minds step in their reasoning check). When this chat
+// has modes and the active Chat Completion preset carries it switched off, the Codex panel offers to switch it on: the
+// same as ticking it in the prompt list. (Two Referents, once a preset gate, is the Engine's own ⛓ Referent Anchor now.)
+const PRESET_HELPERS = ['✚ Metaphysics Check'];
+function presetHelpersOff() {
+    if (ctx().mainApi !== 'openai' || !promptManager?.serviceSettings?.prompts) return [];
+    const out = [];
+    for (const name of PRESET_HELPERS) {
+        const prompt = promptManager.serviceSettings.prompts.find(p => p.name === name);
+        const entry = prompt && promptManager.getPromptOrderEntry(promptManager.activeCharacter, prompt.identifier);
+        if (entry && !entry.enabled) out.push({ name, entry });
+    }
+    return out;
+}
+function renderPresetNudge() {
+    const off = selectionTarget() && on() && currentModes().length ? presetHelpersOff() : [];
+    $('#wh_codex_preset').toggle(off.length > 0);
+    $('#wh_codex_preset_text').text(!off.length ? '' : `Your preset has ${off.map(x => x.name).join(' and ')} switched off. ${off.length > 1 ? 'They help' : 'It helps'} the model keep bodies and minds straight.`);
+}
+function switchOnPresetHelpers() {
+    const off = presetHelpersOff();
+    if (!off.length) return;
+    for (const { entry } of off) entry.enabled = true;
+    promptManager.render();
+    promptManager.saveServiceSettings();
+    renderPresetNudge();
+    toastr.success(`${off.map(x => x.name).join(' and ')} switched on. Save the preset to keep ${off.length > 1 ? 'them' : 'it'} on after you switch presets.`, 'Worldhopper');
 }
 
 function onModeToggle() {
@@ -389,7 +420,7 @@ function speakerName(m) {
     return m.is_user ? (ctx().name1 || 'User') : (m.name || ctx().name2 || 'Narrator');
 }
 
-// Summaryception hides summarised messages as system messages; they are still part of the story.
+// Summaryception hides summarized messages as system messages; they are still part of the story.
 const inStory = m => m?.mes && (!m.is_system || m.extra?.sc_ghosted);
 const isReply = m => inStory(m) && !m.is_user;
 const chatKey = () => ctx().getCurrentChatId?.() ?? ctx().chatId;
@@ -584,7 +615,7 @@ function ledgerStatus(text) {
 
 // The panel's own compact view of the ledger (the prose in renderLedger is written for the model, not for you):
 // one line per body, details on a faint second line that expands on tap.
-// kind colours the row like the strip: 'you' teal, 'npc' violet, 'idle' dashed; icon is a Font Awesome name.
+// kind colors the row like the strip: 'you' teal, 'npc' violet, 'idle' dashed; icon is a Font Awesome name.
 function panelRow(main, sub, hidden, kind = '', icon = '') {
     const row = $('<div class="wh-row"></div>').addClass(kind ? `wh-k-${kind}` : '').append($('<div class="wh-row-main"></div>').text(main));
     if (icon) row.find('.wh-row-main').prepend(`<i class="fa-solid ${icon} wh-row-icon"></i>`);
@@ -655,7 +686,7 @@ function renderStrip() {
     const me = canon(ctx().name1 || '');
     const chip = (kind, icon, title, sub, tip, hidden) => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}" title="${esc(tip)}"><i class="fa-solid ${icon} wh-chip-icon"></i>`
         + `<span class="wh-chip-text"><b>${esc(title)}</b><small>${esc(sub)}${hidden ? ' · hidden <i class="fa-solid fa-eye-slash"></i>' : ''}</small></span></span>`;
-    // Two lines per body; the colour says who is doing it: teal when it's you, violet when it's someone else.
+    // Two lines per body; the color says who is doing it: teal when it's you, violet when it's someone else.
     // A copy is its own person even when it's a copy of you, so it's always violet.
     const chips = bodies.map(b => {
         const body = b.body && b.body.toLowerCase() !== 'none' ? b.body : null;
@@ -674,12 +705,12 @@ function renderStrip() {
 }
 
 // The body roster over the message box while you run more than one body (multipossession, or you as a hive): a card
-// per body in its own colour, saying what it's doing. Tap one to start a line for it; the card for the line you're
+// per body in its own color, saying what it's doing. Tap one to start a line for it; the card for the line you're
 // writing lights up. Past six bodies, or on request, the cards shrink to one-line chips.
 const LANE_HUES = ['29, 158, 117', '127, 119, 221', '216, 90, 48', '212, 83, 126', '186, 117, 23', '55, 138, 221', '99, 153, 34', '226, 75, 74'];
 let laneColourCache = { key: '', map: new Map() };
 
-/** Your own body is always teal; every body you've driven in this chat gets the next colour, in order of first appearance. */
+/** Your own body is always teal; every body you've driven in this chat gets the next color, in order of first appearance. */
 function laneColours() {
     const me = ctx().name1 || '';
     const snaps = ledgerSnapshots();
@@ -754,7 +785,7 @@ function markLanes() {
     });
 }
 
-/** Each [Name] line in the chat takes that body's colour. */
+/** Each [Name] line in the chat takes that body's color. */
 function colourLanes() {
     $('#chat .mes_text .custom-wh-lane').each((_, el) => {
         el.style.setProperty('--wh-hue', laneHue($(el).find('.custom-wh-lane-name').first().text()));
@@ -1244,7 +1275,7 @@ function markAll() {
 let ledgerReady = Promise.resolve();
 const LEDGER_WAIT_MS = 8000;
 
-// What the Engine cost each turn, kept on the reply as extra.wh_timing so a slow turn can be traced afterwards:
+// What the Engine cost each turn, kept on the reply as extra.wh_timing so a slow turn can be traced afterward:
 // wait = how long the reply waited for the Ledger before it was sent; ledger, checks = the work after it came back
 // (ms). The reply's own time is ST's gen_started → gen_finished, which includes the wait.
 let lastWait = 0;
@@ -1392,6 +1423,7 @@ async function addSettingsPanel() {
     $('#wh_codex_suggest_now').on('click', () => enqueue(() => suggestModes({ force: true })));
     $('#wh_codex_edit').on('click', () => { pickerOpen = !$('#wh_codex_modes').is(':visible'); renderCodexPanel(); });
     $('#wh_codex_apply_suggestion').on('click', () => { const t = selectionTarget(); if (t) applySuggestion(t.key); });
+    $('#wh_codex_preset_on').on('click', switchOnPresetHelpers);
 
     bind('#wh_ledger_enabled', () => s.ledger.enabled, v => { settings().ledger.enabled = v; applyLedgerInjection(); renderLedgerPanel(); });
     $('#wh_ledger_backfill').on('click', backfillHistory);
@@ -1501,7 +1533,7 @@ function doctorList(issues) {
     return list;
 }
 
-/** Turn the labelled blocks of a card-builder chat into a new character, with its Codex modes already picked. */
+/** Turn the labeled blocks of a card-builder chat into a new character, with its Codex modes already picked. */
 async function makeCard() {
     const c = ctx();
     if (!c.chat?.length) { toastr.info('Open the card-builder chat first.'); return; }
@@ -1631,7 +1663,7 @@ async function checkCard() {
             out.html(safe.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'));
         } catch (err) {
             out.text(job.signal.aborted
-                ? (job.signal.reason?.message === 'timeout' ? `No answer after ${REVIEW_TIMEOUT_MS / 60000} minutes, so the review stopped. Check the Notes model under Settings → Models, or try again.` : 'Review cancelled.')
+                ? (job.signal.reason?.message === 'timeout' ? `No answer after ${REVIEW_TIMEOUT_MS / 60000} minutes, so the review stopped. Check the Notes model under Settings → Models, or try again.` : 'Review canceled.')
                 : `Couldn't run the review: ${err.message}`);
         } finally {
             clearTimeout(timer);
@@ -1727,6 +1759,10 @@ jQuery(async () => {
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
         if (event_types.MESSAGE_SENT) eventSource.on(event_types.MESSAGE_SENT, () => applyLedgerInjection());
         eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
+        // The preset nudge follows the active preset and its toggles (ticking a block saves the settings).
+        for (const ev of [event_types.OAI_PRESET_CHANGED_AFTER, event_types.SETTINGS_UPDATED, event_types.MAIN_API_CHANGED]) {
+            if (ev) eventSource.on(ev, () => setTimeout(renderPresetNudge, 0));
+        }
         eventSource.on(event_types.CHAT_CHANGED, () => {
             pickerOpen = null;
             renderCodexPanel(); renderLedgerPanel(); renderModelSelects(); renderWorldSelect(); applyLedgerInjection();

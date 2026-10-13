@@ -64,7 +64,7 @@
     font-size: 0.9em;
     cursor: pointer;
 }
-/* One colour per family of modes, in the chips and in the picker's pills. */
+/* One color per family of modes, in the chips and in the picker's pills. */
 .worldhopper-settings .wh-g-occupancy { --wh-g: #9b8cff; }
 .worldhopper-settings .wh-g-overwrite { --wh-g: #e46a9a; }
 .worldhopper-settings .wh-g-reduction { --wh-g: #d9a24a; }
@@ -270,7 +270,7 @@
     transform: translateX(-7px);
     transition: transform 0.15s ease;
 }
-/* !important: some themes force their own colour onto checked boxes, which left the switches and icons mismatched. */
+/* !important: some themes force their own color onto checked boxes, which left the switches and icons mismatched. */
 .worldhopper-settings .wh-switch input[type='checkbox']:checked {
     background-color: var(--wh-accent) !important;
     border-color: var(--wh-accent) !important;
@@ -313,7 +313,7 @@
 }
 .worldhopper-settings .wh-wide-button i { margin-right: 4px; }
 
-/* Ledger rows carry the strip's colours: teal yours, violet someone else's, dashed when nobody is inside. */
+/* Ledger rows carry the strip's colors: teal yours, violet someone else's, dashed when nobody is inside. */
 .worldhopper-settings .wh-box .wh-row { padding-left: 8px; border-left: 3px solid transparent; }
 .worldhopper-settings .wh-box .wh-row.wh-k-you { border-left-color: rgba(29, 158, 117, 0.9); }
 .worldhopper-settings .wh-box .wh-row.wh-k-npc { border-left-color: rgba(127, 119, 221, 0.9); }
@@ -463,7 +463,7 @@
 }
 .mes .wh-as i { color: rgb(29, 158, 117); }
 
-/* The body roster over the message box while you run several bodies: a card per body, in that body's colour
+/* The body roster over the message box while you run several bodies: a card per body, in that body's color
    (--wh-hue, set per card), each starting a "[Name] " line. The card for the line you're writing is outlined. */
 .wh-lanes {
     display: flex;
@@ -521,7 +521,7 @@
 .wh-lanes-size:hover { opacity: 0.9; }
 @media (prefers-reduced-motion: reduce) { .wh-lane-card { transition: none; } }
 
-/* Those lines in your messages (the WH - Body lines script): one labelled row per body, in the roster's colours. */
+/* Those lines in your messages (the WH - Body lines script): one labeled row per body, in the roster's colors. */
 .mes_text .custom-wh-lane {
     --wh-hue: 29, 158, 117;
     margin: 0.3em 0;
@@ -635,38 +635,66 @@
     opacity: 0.85;
 }
 
-/* Possession and release. The writer marks them (%%possession%% … %%/possession%%, %%release%% … %%/release%%) and the
-   WH - Possession / WH - Release regex scripts turn them into these boxes (ST prefixes message classes with custom-). */
+/* Possession, release and the other modes' moments. The writer marks them (%%possession%% … %%/possession%%,
+   %%release%%, and each mode's own %%absorbed%%, %%worn%%, %%trance%% … from its Codex entry); the WH - Possession,
+   WH - Release and WH - Moments regex scripts turn them into these boxes (ST prefixes message classes with custom-).
+   One shape for all of them, like the presets' in-world boxes: a small card in the mode's color, its label a pill on
+   the top edge. Each mode keeps a color and a border of its own, and its label says what it is. */
 .mes_text .custom-wh-possess,
-.mes_text .custom-wh-release {
+.mes_text .custom-wh-release,
+.mes_text .custom-wh-moment {
+    --wh-mc: 178, 126, 255;
     position: relative;
-    margin: 0.9em 0;
-    padding: 0.55em 1.1em 0.65em;
-    border-radius: 12px;
-}
-.mes_text .custom-wh-possess {
-    border: 1px solid rgba(178, 126, 255, 0.45);
-    background: linear-gradient(135deg, rgba(118, 70, 230, 0.16), rgba(214, 64, 170, 0.1));
-    box-shadow: inset 0 0 24px rgba(160, 100, 255, 0.14), 0 0 16px rgba(160, 100, 255, 0.12);
-}
-.mes_text .custom-wh-release {
-    border: 1px dashed rgba(190, 180, 220, 0.35);
-    background: rgba(150, 140, 180, 0.07);
+    margin: 1.35em 0 0.9em;
+    padding: 0.95em 1.1em 0.65em;
+    border-radius: 14px;
+    border: 1px solid rgba(var(--wh-mc), 0.38);
+    background: rgba(var(--wh-mc), 0.07);
+    box-shadow: 0 0 22px rgba(var(--wh-mc), 0.1);
 }
 .mes_text .custom-wh-possess::before,
-.mes_text .custom-wh-release::before {
-    display: block;
-    margin-bottom: 0.35em;
-    text-align: center;
-    font-size: 0.68em;
+.mes_text .custom-wh-release::before,
+.mes_text .custom-wh-moment::before {
+    position: absolute;
+    top: -0.85em;
+    left: 14px;
+    padding: 0.15em 0.8em;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--wh-mc), 0.45);
+    /* the theme's own background under a tint of the mode's color, so the pill sits on the border cleanly */
+    background: linear-gradient(rgba(var(--wh-mc), 0.14), rgba(var(--wh-mc), 0.14)), var(--SmartThemeBlurTintColor, rgb(23, 23, 23));
+    /* the mode's color, pulled toward the theme's text color so it reads on light themes too */
+    color: color-mix(in srgb, rgb(var(--wh-mc)) 72%, var(--SmartThemeBodyColor, currentColor));
+    font-size: 0.62em;
     font-style: normal;
-    letter-spacing: 0.3em;
+    font-weight: 600;
+    line-height: 1.5;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
+    white-space: nowrap;
 }
-.mes_text .custom-wh-possess::before { content: '◈ possession ◈'; color: rgba(206, 180, 255, 0.75); }
-.mes_text .custom-wh-release::before { content: '◇ release ◇'; color: rgba(200, 195, 220, 0.55); }
 .mes_text .custom-wh-possess > p:last-child,
-.mes_text .custom-wh-release > p:last-child { margin-bottom: 0; }
+.mes_text .custom-wh-release > p:last-child,
+.mes_text .custom-wh-moment > p:last-child { margin-bottom: 0; }
+
+.mes_text .custom-wh-possess { background: linear-gradient(135deg, rgba(118, 70, 230, 0.14), rgba(214, 64, 170, 0.08)); }
+.mes_text .custom-wh-possess::before { content: '◈ possession'; }
+.mes_text .custom-wh-release { --wh-mc: 165, 158, 195; border-style: dashed; background: rgba(var(--wh-mc), 0.05); box-shadow: none; }
+.mes_text .custom-wh-release::before { content: '◇ release'; }
+.mes_text .custom-wh-m-absorbed { --wh-mc: 239, 159, 39; background: linear-gradient(135deg, rgba(186, 117, 23, 0.14), rgba(239, 159, 39, 0.05)); }
+.mes_text .custom-wh-m-absorbed::before { content: '⬡ absorbed'; }
+.mes_text .custom-wh-m-worn { --wh-mc: 240, 153, 123; border: 1.5px dashed rgba(var(--wh-mc), 0.55); }
+.mes_text .custom-wh-m-worn::before { content: '❖ worn'; }
+.mes_text .custom-wh-m-shed { --wh-mc: 240, 153, 123; border: 1.5px dotted rgba(var(--wh-mc), 0.4); background: rgba(var(--wh-mc), 0.04); box-shadow: none; }
+.mes_text .custom-wh-m-shed::before { content: '◇ stepped out'; }
+.mes_text .custom-wh-m-trance { --wh-mc: 133, 183, 235; border: 3px double rgba(var(--wh-mc), 0.5); background: radial-gradient(ellipse at center, rgba(55, 138, 221, 0.14), rgba(55, 138, 221, 0.04)); }
+.mes_text .custom-wh-m-trance::before { content: '◎ trance'; }
+.mes_text .custom-wh-m-control { --wh-mc: 212, 83, 126; border-left: 4px solid rgba(var(--wh-mc), 0.9); }
+.mes_text .custom-wh-m-control::before { content: '✦ control'; }
+.mes_text .custom-wh-m-timestop { --wh-mc: 172, 170, 162; filter: grayscale(1); }
+.mes_text .custom-wh-m-timestop::before { content: '❚❚ time stops'; }
+.mes_text .custom-wh-m-resume { --wh-mc: 172, 170, 162; border-style: dashed; background: rgba(var(--wh-mc), 0.04); box-shadow: none; }
+.mes_text .custom-wh-m-resume::before { content: '▶ time resumes'; }
 
 /* The newest one arrives with a ripple; older ones sit still. */
 .mes.last_mes .mes_text .custom-wh-possess { animation: wh-possess-in 1.6s ease-out; }
@@ -684,44 +712,6 @@
     .mes .mes_text .custom-wh-possess,
     .mes .mes_text .custom-wh-release { animation: none; }
 }
-
-/* The other modes' moments (%%absorbed%%, %%worn%%, %%trance%% … from their Codex entries; the WH - Moments script).
-   One shape, a colour and border per mode, and a label on top. */
-.mes_text .custom-wh-moment {
-    --wh-mc: 178, 126, 255;
-    position: relative;
-    margin: 0.9em 0;
-    padding: 0.55em 1.1em 0.65em;
-    border-radius: 12px;
-    border: 1px solid rgba(var(--wh-mc), 0.5);
-    background: rgba(var(--wh-mc), 0.1);
-}
-.mes_text .custom-wh-moment::before {
-    display: block;
-    margin-bottom: 0.35em;
-    text-align: center;
-    font-size: 0.68em;
-    font-style: normal;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: rgba(var(--wh-mc), 0.9);
-}
-.mes_text .custom-wh-moment > p:last-child { margin-bottom: 0; }
-
-.mes_text .custom-wh-m-absorbed { --wh-mc: 239, 159, 39; background: linear-gradient(135deg, rgba(186, 117, 23, 0.16), rgba(239, 159, 39, 0.06)); }
-.mes_text .custom-wh-m-absorbed::before { content: '⬡ absorbed ⬡'; }
-.mes_text .custom-wh-m-worn { --wh-mc: 240, 153, 123; border: 1.5px dashed rgba(var(--wh-mc), 0.6); }
-.mes_text .custom-wh-m-worn::before { content: '❖ worn ❖'; }
-.mes_text .custom-wh-m-shed { --wh-mc: 240, 153, 123; border: 1.5px dotted rgba(var(--wh-mc), 0.4); background: rgba(var(--wh-mc), 0.05); }
-.mes_text .custom-wh-m-shed::before { content: '◇ stepped out ◇'; }
-.mes_text .custom-wh-m-trance { --wh-mc: 133, 183, 235; border: 3px double rgba(var(--wh-mc), 0.55); background: radial-gradient(ellipse at center, rgba(55, 138, 221, 0.16), rgba(55, 138, 221, 0.05)); }
-.mes_text .custom-wh-m-trance::before { content: '◎ trance ◎'; }
-.mes_text .custom-wh-m-control { --wh-mc: 212, 83, 126; border-left: 4px solid rgba(var(--wh-mc), 0.9); border-radius: 0 12px 12px 0; }
-.mes_text .custom-wh-m-control::before { content: '✦ control ✦'; }
-.mes_text .custom-wh-m-timestop { --wh-mc: 211, 209, 199; background: rgba(var(--wh-mc), 0.07); filter: grayscale(1); }
-.mes_text .custom-wh-m-timestop::before { content: '❚❚ time stops ❚❚'; }
-.mes_text .custom-wh-m-resume { --wh-mc: 211, 209, 199; border-style: dashed; background: rgba(var(--wh-mc), 0.04); }
-.mes_text .custom-wh-m-resume::before { content: '▶ time resumes ▶'; }
 
 /* The newest one arrives in its own way; older ones sit still. */
 .mes.last_mes .mes_text .custom-wh-moment { animation: wh-moment-in 1.2s ease-out; }

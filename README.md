@@ -6,11 +6,11 @@ It keeps the rules, the bodies and the prose straight, so the model stops gettin
 </p>
 
 <p align="center">
-<img src="docs/images/chat-bodies.png" width="400" alt="One player running three bodies at a party: a possession box, a colour-coded line for each body, and the body roster over the message box">
+<img src="docs/images/chat-bodies.png" width="400" alt="One player running three bodies at a party: a possession box, a color-coded line for each body, and the body roster over the message box">
 <img src="docs/images/chat-mind-book.png" width="400" alt="The Mind Book bar above the chat, a hypnotized roommate and a controlled friend, with a trance box and a control box in the replies">
 </p>
 
-It pairs with the [Worldhopper preset](https://coz-rp.github.io/) (one preset for Claude, Gemini, DeepSeek and GLM), and works with any other preset, Chat Completion or Text Completion.
+It pairs with the [Worldhopper presets](https://coz-rp.github.io/) (a flagship for every model, plus one each for Claude, Gemini, DeepSeek, GLM, and Kimi and MiMo), and works with any other preset, Chat Completion or Text Completion. With a Worldhopper preset, switch on its ✚ Metaphysics Check in metaphysics chats (the Modes panel offers to when it's off): it reads the Body Ledger and Mind Book before each reply.
 
 > 🧩 **Only what you're into.** Every mode is opt-in and picked per character, and nothing is on until you pick it. If mind control is your thing, pick Mind Control and that's all you'll ever get: no possession rules, no body swaps, no boxes or cards for modes you didn't choose. Mix as many or as few as you like, and change them any time.
 
@@ -42,7 +42,7 @@ It pairs with the [Worldhopper preset](https://coz-rp.github.io/) (one preset fo
 | 🧠 **Mind Book** | What Hypnosis, Mind Control and Altered Perception have put into people (trance stages and triggers, a controlled will, who can't perceive what), with a line for the moment when a trigger is spoken or a hidden person walks in. |
 | 📒 **Body Ledger** | In possession-type chats, records after every reply who is in which body and who holds which power, then feeds it back to the model. |
 | 🟢 **Strip and badges** | Every borrowed body at a glance above the chat: teal when you're the one inside, violet when someone else is. |
-| 👥 **Body roster** | Run several bodies at once and each gets a colour-coded card over the message box that starts a line for it. |
+| 👥 **Body roster** | Run several bodies at once and each gets a color-coded card over the message box that starts a line for it. |
 | 💥 **Moment boxes** | A takeover, an absorption, a trance, a will taking hold, time stopping: each mode's big moment gets its own styled box. |
 | ✍️ **WH Editor** | A separate extension that pairs with this one: flags stock phrases, "not X, but Y" framing and chopped dialogue, and has a model rewrite only those lines. |
 | 🪪 **Card tools** | Make a character from a Card Builder chat, modes and all, and check any card for the things that trip models up. |
@@ -78,7 +78,7 @@ Every section of the panel has a ❔ button that explains it in a few lines, and
 
 A mode is one kind of metaphysics, with its own rules: how it's done, what the subject experiences, who writes what. The rules live in the **WH Metaphysics** lorebook, the Codex. Its entries stay off everywhere, and Worldhopper switches on only the ones for the modes you picked, only in that character's chats.
 
-<img src="docs/images/modes.png" width="300" align="right" alt="The mode picker, with the four families in their own colours, above the Body Ledger and Mind Book cards">
+<img src="docs/images/modes.png" width="300" align="right" alt="The mode picker, with the four families in their own colors, above the Body Ledger and Mind Book cards">
 
 - **Picked per character** (or per group chat). Tap ✏️ to pick, 🪄 to get suggestions from the card, and tap a picked mode to read what it means.
 - **Pick the fewest that carry the card.** Every picked mode is written into every reply, so a mode the card only hints at does more harm than good.
@@ -98,7 +98,7 @@ A mode is one kind of metaphysics, with its own rules: how it's done, what the s
 |  | Skinsuit | a host's hollow skin is worn from within like a garment |
 |  | Hive Mind | minds absorbed into a single network that is the original mind |
 |  | ↳ Reverse Vore | entry by being swallowed, then control seized from inside (with any occupancy mode; brings in Possession if none is picked) |
-| **🧠 Overwrite** | Hypnosis | realistic trances that deepen in stages over sessions, with suggestions sincerely rationalised as the subject's own |
+| **🧠 Overwrite** | Hypnosis | realistic trances that deepen in stages over sessions, with suggestions sincerely rationalized as the subject's own |
 |  | Mind Control | the mind itself taken over: wants, feelings and beliefs set by the controller and felt as the subject's own |
 |  | Altered Perception | premises edited so the altered normal is defended as always true |
 |  | Blank Slate | a mind wiped to a genuine void |
@@ -119,7 +119,7 @@ The Ledger is for the modes where one mind lives in another's body: Possession, 
 - 🏷️ **Names**: one person under several names (a code name, a host number).
 - 🙈 **Whether you know.** Anything kept from you stays out of the narration, and out of the strip's details.
 
-The record goes into the prompt just before the model writes, so names, pronouns and every change stay straight. When it's your doing, the model is told that only you set or change it; when it's done to you, the model plays your changed behaviour and leaves your inner experience to you.
+The record goes into the prompt just before the model writes, so names, pronouns and every change stay straight. When it's your doing, the model is told that only you set or change it; when it's done to you, the model plays your changed behavior and leaves your inner experience to you.
 
 **The strip** above the chat shows it at a glance: 🟢 teal when you're the one inside, 🟣 violet when someone else is, dashed when a body is empty or something is hidden from you. Tap it to edit.
 
@@ -169,10 +169,10 @@ The Body Ledger's counterpart for the modes that change a mind instead of moving
 
 With Multipossession, or as a hive's original mind, you run more than one body at once. The **body roster** makes that easy:
 
-- A card per body sits over the message box, in that body's colour, with what it's doing. Your own body is marked *(you)*.
+- A card per body sits over the message box, in that body's color, with what it's doing. Your own body is marked *(you)*.
 - **Tap a card** to start a line for that body, like `[Jess] leans on the counter`. The card for the line you're on lights up; cards that already have a line say so.
 - A line with no name is you as a whole, and goes to whichever bodies it fits. `Jess:` at the start of a line works too.
-- Your lines show in the chat as rows in the same colours.
+- Your lines show in the chat as rows in the same colors.
 - **Your bodies are yours.** The writer only ever does what you wrote with them, with nothing added. A body you gave nothing stays as you left it; if someone speaks to it, the reply stops and leaves the answer to you.
 - **Copies are their own people.** With Propagation, copies of you are separate people the writer plays, so they never get cards.
 - Past six bodies the cards shrink to chips, and the corner button shrinks them any time.
@@ -260,7 +260,7 @@ All display-only: they change how messages look, never what the model reads.
 | WH - Release | Turns a marked release into a release box |
 | WH - Moments | The boxes for every other mode's moment |
 | WH - Stray markers | Hides a marker whose partner went missing |
-| WH - Body lines | Turns your `[Name]` lines into colour-coded rows |
+| WH - Body lines | Turns your `[Name]` lines into color-coded rows |
 
 You can edit, disable or delete them; the extension leaves your changes alone. They're also on [the site](https://coz-rp.github.io/) as files, in case you ever need to import them yourself.
 
@@ -285,4 +285,6 @@ The extension sends chat text only to the connection profiles you pick under Mod
 
 ## 💜 Credits
 
-Worldhopper Engine by Coz, built with Claude. The Worldhopper 1.1 presets, the Metaphysics Card Builder and the WH Cardmaker preset are on [coz-rp.github.io](https://coz-rp.github.io/).
+Worldhopper Engine by Coz, built with Claude. The Worldhopper 1.2 presets, the Metaphysics Card Builder and the WH Cardmaker preset are on [coz-rp.github.io](https://coz-rp.github.io/).
+
+Two lines of the Metaphysics Core draw on other presets: the narrator settling how a power works when nothing else does comes from Nemo Vivarium, and suspicion that doesn't turn into interrogation from Sun Rider.

@@ -337,7 +337,7 @@ function subjectLine(h, userName) {
     if (sugg.length) out.push(`  Suggestions, acted on as ${h.who}'s own ideas with ordinary reasons: ${sugg.join('; ')}.`);
     if (trig.length) out.push(`  Triggers, firing exactly on cue without ${h.who} noticing the cue: ${trig.join('; ')}.`);
     if (h.amnesia === 'yes' && h.now === 'awake') out.push(`  ${h.who} was told to forget the sessions and has no memory of them.`);
-    if (isPlayer(h.who, userName)) out.push(`  ${h.who} is the player: write what the trance does to ${h.who}'s body and behaviour, and leave ${h.who}'s inner experience to the player.`);
+    if (isPlayer(h.who, userName)) out.push(`  ${h.who} is the player: write what the trance does to ${h.who}'s body and behavior, and leave ${h.who}'s inner experience to the player.`);
     if (h.user_knows === 'no') out.push(`  ${userName} doesn't know about this: narration shows only what ${userName} could notice.`);
     return out.join('\n');
 }
@@ -357,7 +357,7 @@ function willLine(w, userName) {
         const own = w.own ? `Still ${whose} own: ${w.own}.`.replace(/\.\.$/, '.') : `Everything else about ${who} is still ${whose} own.`;
         out.push(`  ${own} The control is felt as ${whose} own wish and pursued with ${whose} own wits and style; nothing in ${who} strains against it.`);
     }
-    if (w.who.some(x => isPlayer(x, userName))) out.push(`  ${userName} is the player: write the changed behaviour, and leave ${userName}'s inner experience to the player.`);
+    if (w.who.some(x => isPlayer(x, userName))) out.push(`  ${userName} is the player: write the changed behavior, and leave ${userName}'s inner experience to the player.`);
     if (w.user_knows === 'no') out.push(`  ${userName} doesn't know about this: narration shows only what ${userName} could notice.`);
     return out.join('\n');
 }
