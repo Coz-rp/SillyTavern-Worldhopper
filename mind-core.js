@@ -170,13 +170,14 @@ Each entry holds:
 - id: keep the id of an entry you change; leave it out for a new one;
 - who: the person under control, or several people given the same will;
 - by: the controller;
-- set: what the controller has set, as a list of {kind, text}, kind one of: wants, feels, believes, loyal to, command. When a new setting conflicts with an older one, keep only the newer. A one-off order carried out on the spot is not worth recording; a standing one ("from now on…") is;
+- set: what the controller has set, as a list of {kind, text}, kind one of: wants, feels, believes, loyal to, command. When a new setting conflicts with an older one, keep only the newer. A one-off order carried out on the spot is not worth recording; a standing one ("from now on…") is, and so is any want, feeling or belief the controller puts in them, even one about what's right in front of them (a %%control%% moment always puts one in);
 - own: what is still their own (personality, skills, relationships the control left alone), or, when the card or what has happened in play makes controlled people blank drones or zombies, say exactly that;
 - resists: "yes" when the card or what has happened in play has this person aware of the control, pushing against it, or only partly under it; otherwise "no". Never "yes" on a guess: only when it has been set up;
 - released: true when the control is lifted entirely;
 - user_knows.
 Answer with ONLY entries that are new or changed, each as its WHOLE current record, in this shape:
 {"control":[{"id":"","who":[""],"by":"","set":[{"kind":"","text":""}],"own":"","resists":"no","released":false,"user_knows":"yes"}]}
+Someone taking over a body (possessing it, wearing it, swapping into it, puppeting it, absorbing it into a hive) is not mind control: the person's own mind isn't the one acting, and the Body Ledger keeps that. Leave it out.
 ${SHARED(userName)}`,
     perception: userName => `You keep the altered-perception record for an adult roleplay: edits someone's power has made to what people perceive or take as true. Three kinds:
 - unseen: they cannot perceive someone or something (target: who or what);
@@ -316,6 +317,19 @@ const STAGE_LINE = {
 const LASTS = { light: 'for this session', medium: 'for hours to days', deep: 'lasting', somnambulistic: 'lasting' };
 const REMEMBERS = { light: 'remembered', medium: 'half-remembered', deep: 'not remembered in detail', somnambulistic: 'not remembered' };
 
+const NOT_FIRST_NAMES = /^(?:the|mr|mrs|ms|miss|mx|dr|doctor|sir|lady|lord|madam|officer|detective|professor|prof|aunt|uncle|old|young|little|big|saint|st|captain|sergeant|nurse|coach|father|mother|sister|brother)$/i;
+/** Whether a full name's first name ("Lena" for "Lena Park") is in the text, capitalized. */
+function firstNameIn(text, name) {
+    const w = String(name || '').trim().split(/\s+/);
+    if (w.length < 2 || !/^\p{Lu}\p{L}{2,}$/u.test(w[0]) || NOT_FIRST_NAMES.test(w[0])) return false;
+    return new RegExp(`(?<![\\p{L}\\p{N}])${w[0]}(?![\\p{L}\\p{N}])`, 'u').test(String(text || ''));
+}
+/** Whether any of these names appears in the text as a whole word, in any case. */
+function nameIn(text, names) {
+    const t = String(text || '');
+    return names.filter(Boolean).some(n => new RegExp(`(?<![\\p{L}\\p{N}])${String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu').test(t));
+}
+
 function subjectLine(h, userName) {
     // Rapid induction works only on a conditioned or highly susceptible subject.
     const conditioned = h.times >= 3 || rank(h.deepest) >= rank('deep') || h.susceptibility === 'high';
@@ -405,12 +419,27 @@ export function watchLines(book, { latest = '', recent = '', userName = 'the pla
 }
 
 /** The <mind_book> block, or '' when there's nothing in it. `kinds` limits it to the picked modes. */
-export function renderMindBook(book, userName = 'the player', { kinds = KINDS, latest = '', recent = '' } = {}) {
+// scene: the last few messages. Given, only the people in the scene (named there, or in a trance right now; an edit
+// everyone has always counts) get their full entry; everyone else gets a name on one short line, and their full entry
+// comes back once they're in a scene again. Left out (the /wh-mind readout), every entry is in full.
+export function renderMindBook(book, userName = 'the player', { kinds = KINDS, latest = '', recent = '', scene = null } = {}) {
     const b = normalizeBook(book);
+    const named = names => scene == null || names.some(n => nameIn(scene, [n]) || firstNameIn(scene, n));
+    const here = {
+        hypnosis: b.hypnosis.filter(h => h.now !== 'awake' || named([h.who])),
+        control: b.control.filter(w => named(w.who)),
+        perception: b.perception.filter(e => e.everyone || named([...e.who, e.target])),
+    };
+    const away = [
+        ...(kinds.includes('hypnosis') ? b.hypnosis.filter(h => !here.hypnosis.includes(h)).map(h => `${h.who} (hypnotized${h.by ? ` by ${h.by}` : ''})`) : []),
+        ...(kinds.includes('control') ? b.control.filter(w => !here.control.includes(w)).map(w => `${join(w.who)} (controlled${w.by ? ` by ${w.by}` : ''})`) : []),
+        ...(kinds.includes('perception') ? b.perception.filter(e => !here.perception.includes(e)).map(e => `${join(e.who)} (altered perception)`) : []),
+    ];
     const parts = [];
-    if (kinds.includes('hypnosis') && b.hypnosis.length) parts.push('Hypnosis (realistic: patience, stages, repetition):', ...b.hypnosis.map(h => subjectLine(h, userName)));
-    if (kinds.includes('control') && b.control.length) parts.push('Mind control:', ...b.control.map(w => willLine(w, userName)));
-    if (kinds.includes('perception') && b.perception.length) parts.push('Altered perception:', ...b.perception.map(e => editLine(e, userName)));
+    if (kinds.includes('hypnosis') && here.hypnosis.length) parts.push('Hypnosis (realistic: patience, stages, repetition):', ...here.hypnosis.map(h => subjectLine(h, userName)));
+    if (kinds.includes('control') && here.control.length) parts.push('Mind control:', ...here.control.map(w => willLine(w, userName)));
+    if (kinds.includes('perception') && here.perception.length) parts.push('Altered perception:', ...here.perception.map(e => editLine(e, userName)));
+    if (away.length) parts.push(`Also in the book, not in this scene (their full entries come back when they are): ${away.join('; ')}.`);
     const watch = watchLines({ hypnosis: kinds.includes('hypnosis') ? b.hypnosis : [], control: kinds.includes('control') ? b.control : [], perception: kinds.includes('perception') ? b.perception : [] }, { latest, recent, userName });
     if (!parts.length && !watch.length) return '';
     return ['<mind_book>', 'What mind-changing powers have put into people, as it stands now. Where the chat itself says otherwise, the chat wins.',

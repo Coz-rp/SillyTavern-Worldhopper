@@ -1,6 +1,6 @@
 // Build the Codex lorebook (WH Metaphysics) from the source files in codex/:
 //   codex/modes/NN Name.md     → "👁 Name"   (00 is Metaphysics Core, armed whenever any mode is picked)
-//   codex/anchors/NN Name.md   → "⛓ Name"   (depth-0 reminders; Initiative Anchor follows the "Powers get used" setting)
+//   codex/anchors/NN Name.md   → "⛓ Name"   (depth-0 reminders; Initiative Anchor comes with any mode)
 //   codex/details/NN Mode · topic.md → "📖 Mode · topic" (key: lines, then ---, then the text; fire on topic words)
 // The number prefix only sets the order. Writes codex/WH Metaphysics.json, which ships with the extension; the
 // extension installs it into SillyTavern and keeps it updated (unless you've edited the installed copy).
@@ -26,7 +26,7 @@ const README = `{{// ✦ WH Metaphysics — the Worldhopper Codex. Managed by th
 Every entry in this book is stored DISABLED on purpose. The extension switches on, per generation:
 • 👁 Metaphysics Core, whenever any mode is picked for the current character
 • each 👁 mode picked in the Worldhopper Engine panel (Extensions → Worldhopper Engine → Modes)
-• the ⛓ anchor of each picked mode that has one (depth 0), and ⛓ Initiative Anchor when "Powers get used" is on
+• the ⛓ anchor of each picked mode that has one (depth 0), and ⛓ Initiative Anchor with any mode
 • 📖 detail entries of picked modes, only when their topic words appear in the last two messages (depth 1, sticky 3)
 Without the extension nothing here fires, so a missing or broken extension can never inject the wrong mode.
 

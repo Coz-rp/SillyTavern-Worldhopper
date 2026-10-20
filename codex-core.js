@@ -3,17 +3,17 @@
 //   "👁 Metaphysics Core" · "👁 <Mode>" · "⛓ <Anchor>" · "📖 <Mode> · <topic>"
 
 export const MODE_GROUPS = [
-    ['Occupancy', ['Possession', 'Multipossession', 'Propagation', 'Copy Fidelity', 'Puppetry', 'Skinsuit', 'Hive Mind', 'Reverse Vore']],
+    ['Occupancy', ['Possession', 'Multipossession', 'Propagation', 'Copy Fidelity', 'Puppetry', 'Skinsuit', 'Hive Mind', 'Body Swap', 'Reverse Vore']],
     ['Overwrite', ['Hypnosis', 'Mind Control', 'Altered Perception', 'Blank Slate', 'Dronification', 'Pet Play']],
     ['Reduction', ['Dollification', 'Limp Play']],
-    ['Other', ['Soul Play', 'Timestop', 'Segmentation']],
+    ['Other', ['Soul Play', 'Timestop', 'Segmentation', 'Transformation']],
 ];
 
 // Modifiers pull in the mode they modify. Reverse Vore modifies whichever occupancy mode is picked, and brings in
 // Possession when none is (its entry hands control to "the active occupancy mode").
 export const PARENT = { 'Multipossession': 'Possession', 'Copy Fidelity': 'Propagation' };
 export const MODIFIERS = new Set(['Multipossession', 'Copy Fidelity', 'Reverse Vore']);
-const OCCUPANCY_BASE = ['Possession', 'Propagation', 'Puppetry', 'Skinsuit', 'Hive Mind'];
+const OCCUPANCY_BASE = ['Possession', 'Propagation', 'Puppetry', 'Skinsuit', 'Hive Mind', 'Body Swap'];
 
 // Each anchor comes in with its mode, or with any of a list of modes.
 export const ANCHOR_FOR = {
@@ -21,6 +21,9 @@ export const ANCHOR_FOR = {
     '⛓ Propagation Anchor': 'Propagation',
     '⛓ Puppetry Anchor': 'Puppetry',
     '⛓ Skinsuit Anchor': 'Skinsuit',
+    '⛓ Transformation Anchor': 'Transformation',
+    // A swap names people by who they are, not by the body, so it has its own reminder instead of the Referent one.
+    '⛓ Swap Anchor': 'Body Swap',
     // A body's name and pronouns apart from the mind driving it: every mode where a mind drives someone else's body
     // (Multipossession and Reverse Vore bring in Possession).
     '⛓ Referent Anchor': ['Possession', 'Skinsuit', 'Hive Mind', 'Puppetry'],
@@ -37,6 +40,7 @@ export const MODE_BLURBS = {
     'Puppetry': 'an empty body driven from outside by a controller in their own skin',
     'Skinsuit': "a host's hollow skin is worn from within like a garment",
     'Hive Mind': 'minds absorbed into a single network that is the original mind',
+    'Body Swap': "two people trade bodies, each mind awake and living the other's life until it's undone",
     'Reverse Vore': 'entry by being swallowed, then control seized from inside',
     'Hypnosis': 'realistic trances that deepen in stages over sessions, with suggestions sincerely rationalized as the subject\'s own',
     'Mind Control': "the mind itself taken over: wants, feelings and beliefs set by the controller and felt as the subject's own",
@@ -49,6 +53,7 @@ export const MODE_BLURBS = {
     'Soul Play': 'souls as objects that can be moved, split, merged or stored',
     'Timestop': 'time frozen for everyone except whoever stopped it',
     'Segmentation': 'body parts removed and exchanged freely',
+    'Transformation': 'a body physically changes form (sex, build, species) while the mind stays the same person',
 };
 
 // Every picked mode is written into the prompt, so over-picking floods it: suggestions of 13-15 modes (Puppetry,
@@ -58,7 +63,7 @@ export const MAX_SUGGESTED = 3;
 export function buildSuggestMessages(cardText, name) {
     const list = ALL_MODES.map(m => `- ${m}: ${MODE_BLURBS[m]}`).join('\n');
     return [
-        { role: 'system', content: `You classify roleplay character cards by which body/mind mechanics they use. The mechanics:\n${list}\nPick the fewest mechanics that cover the card's premise: its central power first, then only others the card plainly makes part of the premise or a character's power. At most ${MAX_SUGGESTED}. Every mechanic picked gets written into the story, so one the card only hints at, lists as a possibility, or never uses does not belong. A passing word ("she went limp", "a doll-like face", "her soul") is not a mechanic. A body left slack or empty when a possessor leaves is part of Possession, not Limp Play; Limp Play is only when making someone go limp is itself the power or the point. Answer with one line and nothing else:\nMODES: <comma-separated names from the list, most central first>\nor\nMODES: none` },
+        { role: 'system', content: `You classify roleplay character cards by which body/mind mechanics they use. The mechanics:\n${list}\nPick the fewest mechanics that cover the card's premise: its central power first, then only others the card plainly makes part of the premise or a character's power. At most ${MAX_SUGGESTED}. Every mechanic picked gets written into the story, so one the card only hints at, lists as a possibility, or never uses does not belong. A passing word ("she went limp", "a doll-like face", "her soul") is not a mechanic. A body left slack or empty when a possessor leaves is part of Possession, not Limp Play; Limp Play is only when making someone go limp is itself the power or the point. Two minds trading bodies with each other is Body Swap, not Possession, which has one mind enter a host whose own mind goes out. A body changing its own shape is Transformation; wearing someone else's shape is Skinsuit. Answer with one line and nothing else:\nMODES: <comma-separated names from the list, most central first>\nor\nMODES: none` },
         { role: 'user', content: `Card: ${name}\n<<<\n${String(cardText).slice(0, 6000)}\n>>>` },
     ];
 }
@@ -83,11 +88,12 @@ export function expandModes(picked) {
  * @returns {'constant'|'keyed'|null} constant = inject unconditionally; keyed = allow its own keys to trigger it;
  *          null = leave it off.
  */
-export function planEntry(title, active, { anchors = true, details = true, initiative = true } = {}) {
+export function planEntry(title, active, { anchors = true, details = true } = {}) {
     if (!active.size) return null;
     const t = String(title || '').trim();
     if (t === '👁 Metaphysics Core') return 'constant';
-    if (t === '⛓ Initiative Anchor') return initiative ? 'constant' : null;
+    // Characters with a power use it: part of every mode, not a choice.
+    if (t === '⛓ Initiative Anchor') return 'constant';
     if (t.startsWith('👁 ')) return active.has(t.slice(2).trim()) ? 'constant' : null;
     if (t.startsWith('⛓ ')) return anchors && [ANCHOR_FOR[t]].flat().some(m => active.has(m)) ? 'constant' : null;
     if (t.startsWith('📖 ')) {
@@ -101,7 +107,7 @@ export function planEntry(title, active, { anchors = true, details = true, initi
 // scripts, display-only, like the preset's text and sign styling. The markdown="1" makes showdown format the prose
 // inside the box; ST renames the classes to custom-wh-…, which style.css styles.
 // The other modes' moments, each marked %%name%% … %%/name%% by its own Codex entry.
-export const MOMENTS = ['absorbed', 'worn', 'shed', 'trance', 'control', 'timestop', 'resume'];
+export const MOMENTS = ['absorbed', 'worn', 'shed', 'trance', 'control', 'timestop', 'resume', 'swap', 'transform'];
 export const DISPLAY_SCRIPTS = [
     { id: 'wh-possession-box', scriptName: 'WH - Possession', findRegex: '/%%possession%%[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*%%\\/possession%%/gi', replaceString: '<div class="wh-possess" markdown="1">\n$1\n</div>' },
     { id: 'wh-release-box', scriptName: 'WH - Release', findRegex: '/%%release%%[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*%%\\/release%%/gi', replaceString: '<div class="wh-release" markdown="1">\n$1\n</div>' },

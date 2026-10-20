@@ -323,64 +323,6 @@
 .worldhopper-settings .wh-key-you { background: rgb(29, 158, 117); }
 .worldhopper-settings .wh-key-npc { background: rgb(127, 119, 221); }
 
-/* Ledger editor popup: one collapsed line per body, tap to edit */
-.wh-ledger-editor {
-    text-align: left;
-    --wh-line: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.15));
-}
-.wh-ledger-editor .wh-muted { opacity: 0.65; display: block; margin-bottom: 6px; }
-.wh-ledger-editor .wh-mini-title {
-    margin: 12px 0 2px;
-    font-size: 0.75em;
-    opacity: 0.55;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.wh-ledger-editor .wh-ledger-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: 6px 0;
-}
-.wh-ledger-editor .wh-body-card {
-    border: 1px solid var(--wh-line);
-    border-radius: 6px;
-}
-.wh-ledger-editor .wh-body-card > summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 4px 4px 4px 10px;
-    cursor: pointer;
-    list-style: none;
-}
-.wh-ledger-editor .wh-body-card > summary::-webkit-details-marker { display: none; }
-.wh-ledger-editor .wh-body-title { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wh-ledger-editor .wh-body-title small { opacity: 0.6; font-weight: 400; }
-.wh-ledger-editor .wh-fields {
-    display: grid;
-    grid-template-columns: 1fr minmax(70px, 110px);
-    gap: 4px 6px;
-    padding: 2px 10px 10px;
-}
-.wh-ledger-editor .wh-full { grid-column: 1 / -1; }
-.wh-ledger-editor .wh-f { display: flex; flex-direction: column; min-width: 0; margin: 0; }
-.wh-ledger-editor .wh-f small { font-size: 0.75em; opacity: 0.6; }
-.wh-ledger-editor .wh-f input { margin: 0; }
-.wh-ledger-editor .wh-pair {
-    display: grid;
-    grid-template-columns: minmax(90px, 1fr) minmax(140px, 2fr) auto;
-    gap: 6px;
-    align-items: end;
-}
-.wh-ledger-editor .wh-row-del {
-    margin: 0;
-    padding: 4px 7px;
-    font-size: 0.85em;
-    flex-shrink: 0;
-}
-
 /* The ⟲ toggle only appears on messages the Editor actually changed. */
 .mes .wh-undo {
     display: none;
@@ -429,6 +371,11 @@
     background: rgba(255, 255, 255, 0.04);
 }
 .wh-ledger-strip .wh-chip-icon { font-size: 15px; opacity: 0.85; width: 16px; text-align: center; }
+/* A face in place of the icon: a picture of the person, or their card's avatar, ringed in the chip's color. */
+.wh-ledger-strip .wh-chip.wh-has-face { padding-left: 3px; }
+.wh-ledger-strip .wh-chip-face { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; object-position: 50% 22%; flex: none; border: 1.5px solid rgba(255, 255, 255, 0.3); }
+.wh-ledger-strip .wh-chip.wh-you .wh-chip-face { border-color: rgb(var(--wh-you)); }
+.wh-ledger-strip .wh-chip.wh-npc .wh-chip-face { border-color: rgb(var(--wh-npc)); }
 .wh-ledger-strip .wh-chip-text { display: flex; flex-direction: column; justify-content: center; line-height: 1.2; }
 .wh-ledger-strip .wh-chip-text b { font-weight: 600; font-size: 13px; }
 .wh-ledger-strip .wh-chip-text small { font-size: 11px; opacity: 0.7; }
@@ -695,6 +642,10 @@
 .mes_text .custom-wh-m-timestop::before { content: '❚❚ time stops'; }
 .mes_text .custom-wh-m-resume { --wh-mc: 172, 170, 162; border-style: dashed; background: rgba(var(--wh-mc), 0.04); box-shadow: none; }
 .mes_text .custom-wh-m-resume::before { content: '▶ time resumes'; }
+.mes_text .custom-wh-m-swap { --wh-mc: 99, 183, 160; border: 1.5px solid rgba(var(--wh-mc), 0.5); background: linear-gradient(90deg, rgba(var(--wh-mc), 0.12), rgba(var(--wh-mc), 0.03), rgba(var(--wh-mc), 0.12)); }
+.mes_text .custom-wh-m-swap::before { content: '⇄ swap'; }
+.mes_text .custom-wh-m-transform { --wh-mc: 163, 196, 74; border: 1.5px solid rgba(var(--wh-mc), 0.5); background: linear-gradient(160deg, rgba(var(--wh-mc), 0.16), rgba(var(--wh-mc), 0.03)); }
+.mes_text .custom-wh-m-transform::before { content: '✧ transformation'; }
 
 /* The newest one arrives with a ripple; older ones sit still. */
 .mes.last_mes .mes_text .custom-wh-possess { animation: wh-possess-in 1.6s ease-out; }
@@ -727,3 +678,232 @@
 @media (prefers-reduced-motion: reduce) {
     .mes .mes_text .custom-wh-moment { animation: none; }
 }
+
+/* ------------------------------------------------------------------ the Ledger and Mind Book views (tap a bar)
+   A card per body or person. Teal is you, violet someone else, warm gold someone back in their own body, grey empty.
+   Colors come from the theme, so it follows whatever theme is on. */
+.wh-dos {
+    --wh-you: 29, 158, 117;
+    --wh-npc: 127, 119, 221;
+    --wh-back: 214, 160, 72;
+    --wh-idle: 150, 150, 160;
+    --wh-accent: var(--SmartThemeQuoteColor, #e18a24);
+    --wh-line: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.14));
+    --wh-card: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 4%, transparent);
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.wh-dos .wh-dos-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--wh-line); }
+.wh-dos .wh-dos-title { margin: 0; font-size: 1.25em; display: flex; align-items: center; gap: 8px; }
+.wh-dos .wh-dos-title i { color: var(--wh-accent); }
+.wh-dos .wh-dos-sub { display: block; opacity: 0.65; margin-top: 2px; }
+.wh-dos .wh-dos-section {
+    display: flex; align-items: center; gap: 7px; margin-top: 4px;
+    font-size: 0.78em; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75;
+}
+.wh-dos .wh-dos-section i { color: var(--wh-accent); opacity: 0.9; }
+.wh-dos .wh-dos-count {
+    font-size: 0.9em; letter-spacing: 0; padding: 0 7px; border-radius: 999px;
+    background: color-mix(in srgb, var(--wh-accent) 20%, transparent);
+}
+.wh-dos .wh-dos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 10px; }
+.wh-dos .wh-dos-card {
+    --k: var(--wh-idle);
+    display: flex; flex-direction: column; gap: 9px;
+    padding: 12px;
+    border: 1px solid var(--wh-line);
+    border-top: 3px solid rgba(var(--k), 0.85);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(var(--k), 0.10), transparent 70%), var(--wh-card);
+}
+.wh-dos .wh-dos-k-you { --k: var(--wh-you); }
+.wh-dos .wh-dos-k-npc { --k: var(--wh-npc); }
+.wh-dos .wh-dos-k-back { --k: var(--wh-back); }
+.wh-dos .wh-dos-k-idle, .wh-dos .wh-dos-k-mind { --k: var(--wh-idle); }
+.wh-dos .wh-dos-card-head { display: flex; gap: 11px; align-items: center; }
+.wh-dos .wh-dos-avatar {
+    --k: var(--wh-idle);
+    flex: none; width: 54px; height: 54px; border-radius: 50%;
+    display: grid; place-items: center; overflow: hidden;
+    font-size: 1.35em; font-weight: 700;
+    color: rgb(var(--k));
+    background: radial-gradient(circle at 35% 30%, rgba(var(--k), 0.35), rgba(var(--k), 0.12));
+    border: 2px solid rgba(var(--k), 0.75);
+    box-shadow: 0 0 0 3px rgba(var(--k), 0.12);
+}
+.wh-dos .wh-dos-avatar.wh-dos-k-you { --k: var(--wh-you); }
+.wh-dos .wh-dos-avatar.wh-dos-k-npc { --k: var(--wh-npc); }
+.wh-dos .wh-dos-avatar.wh-dos-k-back { --k: var(--wh-back); }
+.wh-dos .wh-dos-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; }
+.wh-dos .wh-dos-titles { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.wh-dos .wh-dos-name { font-size: 1.1em; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.wh-dos .wh-dos-pron { font-weight: 400; opacity: 0.6; margin-left: 6px; font-size: 0.8em; }
+.wh-dos .wh-dos-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+.wh-dos .wh-dos-pill {
+    --k: var(--wh-idle);
+    font-size: 0.78em; line-height: 1.5; padding: 0 8px; border-radius: 999px; white-space: nowrap;
+    border: 1px solid rgba(var(--k), 0.55);
+    background: rgba(var(--k), 0.16);
+}
+.wh-dos .wh-dos-pill.wh-dos-k-you { --k: var(--wh-you); }
+.wh-dos .wh-dos-pill.wh-dos-k-npc { --k: var(--wh-npc); }
+.wh-dos .wh-dos-pill.wh-dos-k-back { --k: var(--wh-back); }
+.wh-dos .wh-dos-pill.wh-dos-soft { border-color: var(--wh-line); background: transparent; opacity: 0.85; }
+.wh-dos .wh-dos-pill.wh-dos-hidden { border-style: dashed; background: transparent; opacity: 0.85; }
+.wh-dos .wh-dos-pill.wh-dos-warn { --k: 226, 75, 74; }
+.wh-dos .wh-dos-facts { display: flex; flex-direction: column; gap: 3px; font-size: 0.9em; }
+.wh-dos .wh-dos-fact { display: flex; gap: 8px; align-items: baseline; }
+.wh-dos .wh-dos-fact i { width: 14px; text-align: center; opacity: 0.6; flex: none; }
+.wh-dos .wh-dos-faint { opacity: 0.6; }
+.wh-dos .wh-dos-sheet {
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 9px 10px; border-radius: 9px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 5%, transparent);
+    border-left: 2px solid rgba(var(--k), 0.6);
+    font-size: 0.88em; line-height: 1.45;
+}
+.wh-dos .wh-dos-sheet-row { display: block; }
+.wh-dos .wh-dos-label { color: var(--wh-accent); font-weight: 700; margin-right: 6px; }
+.wh-dos .wh-dos-note { font-size: 0.85em; opacity: 0.6; font-style: italic; }
+.wh-dos .wh-dos-btn { margin: 0; width: 30px; height: 30px; font-size: 0.85em; }
+.wh-dos .wh-dos-busy { font-style: normal; opacity: 0.85; }
+.wh-dos .wh-dos-empty { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px dashed var(--wh-line); border-radius: 12px; opacity: 0.75; }
+.wh-dos .wh-dos-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wh-dos .wh-dos-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px; font-size: 0.88em;
+    border: 1px solid var(--wh-line); background: var(--wh-card);
+}
+.wh-dos .wh-dos-chip i { color: var(--wh-accent); opacity: 0.85; }
+.wh-dos .wh-dos-timeline { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; }
+.wh-dos .wh-dos-timeline::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 2px; background: var(--wh-line); }
+.wh-dos .wh-dos-timeline li { position: relative; padding: 2px 0 10px 8px; }
+.wh-dos .wh-dos-timeline li::before {
+    content: ""; position: absolute; left: -16px; top: 6px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--SmartThemeBlurTintColor, #222); border: 2px solid var(--wh-accent);
+}
+.wh-dos .wh-dos-timeline li.wh-dos-now::before { background: var(--wh-accent); }
+.wh-dos .wh-dos-tl-title { font-weight: 700; display: flex; gap: 6px; align-items: center; }
+.wh-dos .wh-dos-tl-line { font-size: 0.88em; opacity: 0.85; }
+.wh-dos .wh-dos-more > summary { cursor: pointer; opacity: 0.8; padding: 4px 0; }
+.wh-dos .wh-dos-more[open] > summary { margin-bottom: 8px; }
+.wh-dos .wh-dos-trance { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 12px; }
+.wh-dos .wh-dos-stage { position: relative; text-align: center; font-size: 0.7em; line-height: 1; padding: 14px 0 0; opacity: 0.55; }
+.wh-dos .wh-dos-stage::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px; border-radius: 4px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 12%, transparent);
+}
+.wh-dos .wh-dos-stage.wh-on::before { background: linear-gradient(90deg, rgba(var(--k), 0.55), rgba(var(--k), 0.95)); }
+.wh-dos .wh-dos-stage.wh-now { opacity: 1; font-weight: 700; }
+.wh-dos .wh-dos-stage.wh-deepest::after { content: "▾ deepest"; position: absolute; left: 0; right: 0; top: -12px; font-size: 0.85em; opacity: 0.7; font-weight: 400; }
+.wh-dos .wh-dos-list { display: flex; flex-direction: column; gap: 4px; font-size: 0.9em; }
+.wh-dos .wh-dos-list-title { font-size: 0.8em; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.6; }
+.wh-dos .wh-dos-item { display: flex; gap: 7px; align-items: baseline; }
+.wh-dos .wh-dos-item > .wh-dos-tag, .wh-dos .wh-dos-item > .wh-dos-cue, .wh-dos .wh-dos-item > i { flex: none; }
+.wh-dos .wh-dos-item > span:not(.wh-dos-tag):not(.wh-dos-cue) { min-width: 0; }
+.wh-dos .wh-dos-tag { font-size: 0.78em; padding: 0 7px; border-radius: 6px; white-space: nowrap; background: rgba(var(--k), 0.18); border: 1px solid rgba(var(--k), 0.45); }
+.wh-dos .wh-dos-cue { font-weight: 700; color: var(--wh-accent); }
+.wh-dos .wh-dos-quote { padding: 8px 10px; border-left: 2px solid rgba(var(--k), 0.6); border-radius: 6px; background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 5%, transparent); font-size: 0.92em; }
+@media (max-width: 600px) {
+    .wh-dos .wh-dos-head { flex-direction: column; }
+    .wh-dos .wh-dos-avatar { width: 46px; height: 46px; }
+}
+
+/* A part of a card that can be changed on its own: a faint ✏️ in its corner, clearer on hover; always a little
+   visible on touch screens, where there's no hover. */
+.wh-dos .wh-dos-part { position: relative; min-width: 0; padding-right: 22px; border-radius: 8px; }
+.wh-dos .wh-dos-part.wh-dos-grow { flex: 1; }
+.wh-dos .wh-dos-tools { position: absolute; top: 0; right: 0; display: flex; gap: 2px; }
+.wh-dos .wh-dos-tool {
+    display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px;
+    font-size: 0.72em; cursor: pointer; opacity: 0; transition: opacity 0.15s, background 0.15s;
+}
+.wh-dos .wh-dos-card:hover .wh-dos-tool, .wh-dos .wh-dos-part:focus-within .wh-dos-tool { opacity: 0.45; }
+.wh-dos .wh-dos-part:hover .wh-dos-tool { opacity: 0.8; }
+.wh-dos .wh-dos-tool:hover, .wh-dos .wh-dos-tool:focus-visible { opacity: 1 !important; background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 12%, transparent); outline: none; }
+@media (hover: none) { .wh-dos .wh-dos-tool { opacity: 0.45; } }
+.wh-dos .wh-dos-sheet-part .wh-dos-tools { top: 5px; right: 4px; }
+.wh-dos .wh-dos-sheet-part { padding-right: 0; }
+.wh-dos .wh-dos-sheet-part .wh-dos-sheet, .wh-dos .wh-dos-sheet-part .wh-dos-note { padding-right: 74px; }
+.wh-dos .wh-dos-small { font-size: 0.8em; margin-top: 4px; }
+
+/* The small form a part turns into. */
+.wh-dos .wh-dos-form {
+    display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; min-width: 0;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--wh-accent) 45%, transparent);
+}
+/* A card's heading turns into its form under the face, at the card's full width. */
+.wh-dos .wh-dos-card-head:has(> .wh-dos-form) { flex-wrap: wrap; }
+.wh-dos .wh-dos-card-head > .wh-dos-form { flex: 1 1 100%; }
+.wh-dos .wh-dos-chips > .wh-dos-form { flex-basis: 100%; }
+.wh-dos .wh-dos-form-title { font-weight: 700; font-size: 0.95em; }
+.wh-dos .wh-dos-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr)); gap: 6px 8px; }
+.wh-dos .wh-dos-full { grid-column: 1 / -1; }
+.wh-dos .wh-dos-f { display: flex; flex-direction: column; min-width: 0; margin: 0; gap: 2px; }
+.wh-dos .wh-dos-f small { font-size: 0.75em; opacity: 0.65; }
+.wh-dos .wh-dos-f input, .wh-dos .wh-dos-f textarea, .wh-dos .wh-dos-f select { margin: 0; }
+.wh-dos .wh-dos-f textarea { resize: vertical; min-height: 2.6em; }
+.wh-dos .wh-dos-form .checkbox_label { margin: 0; font-size: 0.9em; }
+.wh-dos .wh-dos-form-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wh-dos .wh-dos-form-actions.wh-dos-center { justify-content: center; }
+.wh-dos .wh-dos-grow { flex: 1; }
+.wh-dos .wh-dos-tbtn { margin: 0; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 0.88em; white-space: nowrap; }
+.wh-dos .wh-dos-primary { border-color: color-mix(in srgb, var(--wh-accent) 70%, transparent); background: color-mix(in srgb, var(--wh-accent) 22%, transparent); }
+.wh-dos .wh-dos-danger { color: rgb(226, 95, 94); }
+.wh-dos .wh-dos-head > .wh-dos-tbtn { flex: none; align-self: center; }
+.wh-dos .wh-dos-batch { flex: none; align-self: center; font-size: 0.88em; opacity: 0.85; white-space: nowrap; }
+
+/* Adding: a dashed card at the end of a grid, a dashed chip after the chips. */
+.wh-dos .wh-dos-add {
+    border: 1px dashed var(--wh-line); background: transparent; min-height: 84px;
+    display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer; opacity: 0.6; transition: opacity 0.15s, border-color 0.15s;
+}
+.wh-dos .wh-dos-add:hover, .wh-dos .wh-dos-add:focus-visible { opacity: 1; border-color: var(--wh-accent); outline: none; }
+.wh-dos .wh-dos-chip-add { border-style: dashed; cursor: pointer; opacity: 0.65; background: transparent; }
+.wh-dos .wh-dos-chip-add:hover, .wh-dos .wh-dos-tap:hover { opacity: 1; border-color: var(--wh-accent); }
+.wh-dos .wh-dos-tap { cursor: pointer; }
+
+/* Faces: a picture or an initial; one without a card of its own is a button (a small badge says so). */
+.wh-dos .wh-dos-avatar { position: relative; overflow: visible; }
+.wh-dos .wh-dos-avatar > img { border-radius: 50%; }
+.wh-dos .wh-dos-avatar.wh-dos-pic { cursor: pointer; }
+.wh-dos .wh-dos-avatar.wh-dos-pic:hover, .wh-dos .wh-dos-avatar.wh-dos-pic:focus-visible { box-shadow: 0 0 0 3px rgba(var(--k), 0.35); outline: none; }
+.wh-dos .wh-dos-badge {
+    position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 10px;
+    background: var(--SmartThemeBlurTintColor, #222); border: 1px solid rgba(var(--k), 0.7); color: rgb(var(--k));
+    opacity: 0; transition: opacity 0.15s;
+}
+.wh-dos .wh-dos-card:hover .wh-dos-badge, .wh-dos .wh-dos-avatar:focus-visible .wh-dos-badge { opacity: 1; }
+.wh-dos .wh-dos-avatar:not(:has(img)) .wh-dos-badge { opacity: 0.85; }
+@media (hover: none) { .wh-dos .wh-dos-badge { opacity: 0.85; } }
+.wh-dos .wh-dos-spin { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; }
+
+/* One person's picture, large. */
+.wh-dos.wh-dos-picture { align-items: center; text-align: center; }
+.wh-dos .wh-dos-frame {
+    --k: var(--wh-idle);
+    position: relative; width: min(100%, 360px); aspect-ratio: 1; border-radius: 16px; overflow: hidden;
+    display: grid; place-items: center;
+    border: 2px solid rgba(var(--k), 0.6);
+    background: radial-gradient(circle at 35% 30%, rgba(var(--k), 0.3), rgba(var(--k), 0.08));
+}
+.wh-dos .wh-dos-frame.wh-dos-k-you { --k: var(--wh-you); }
+.wh-dos .wh-dos-frame.wh-dos-k-npc { --k: var(--wh-npc); }
+.wh-dos .wh-dos-frame.wh-dos-k-back { --k: var(--wh-back); }
+.wh-dos .wh-dos-frame > img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; }
+.wh-dos .wh-dos-frame > .wh-dos-initial { font-size: 5em; font-weight: 700; color: rgb(var(--k)); }
+.wh-dos .wh-dos-frame-busy { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 1.1em; }
+.wh-dos .wh-dos-frame-busy i { font-size: 1.8em; }
+.wh-dos .wh-dos-look { max-width: 420px; font-size: 0.9em; line-height: 1.45; display: flex; gap: 6px; align-items: baseline; justify-content: center; flex-wrap: wrap; }
+.wh-dos .wh-dos-look .wh-dos-tool { opacity: 0.6; }
+
+/* Settings → Pictures */
+.worldhopper-settings .wh-pic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 6px 8px; margin-top: 6px; }
+.worldhopper-settings .wh-pic-grid label { display: flex; flex-direction: column; gap: 2px; margin: 0; }
+.worldhopper-settings .wh-pic-grid small { opacity: 0.7; }
+.worldhopper-settings .wh-pic-grid select { margin: 0; }

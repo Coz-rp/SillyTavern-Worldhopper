@@ -1,0 +1,1 @@
+[Reminder: a transformed body stays transformed. Write it as it is now, in every scene, and never let it drift back toward its old description; the mind inside is the same person unless the card says the change reached it too. Nobody is ever made younger than an adult.]

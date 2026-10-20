@@ -106,6 +106,29 @@ export const isEmptyLedger = l => !l || (!l.bodies?.length && !l.powers?.length)
 const COPY = /cop(y|ied)|propagat/i;
 const PUPPET = /puppet/i;
 
+/** Whether any of these names appears in the text as a whole word, in any case: who is in the scene. */
+export function namedIn(text, names) {
+    const t = String(text || '');
+    return names.filter(Boolean).some(n => new RegExp(`(?<![\\p{L}\\p{N}])${String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu').test(t));
+}
+
+// Titles and words that can start a name without being what people call the person.
+const NOT_FIRST_NAMES = /^(?:the|mr|mrs|ms|miss|mx|dr|doctor|sir|lady|lord|madam|officer|detective|professor|prof|aunt|uncle|old|young|little|big|saint|st|captain|sergeant|nurse|coach|father|mother|sister|brother)$/i;
+/** A full name's first name, the way a story usually says it ("Lena" for "Lena Park"); '' for a one-word name or a title. */
+export function firstName(name) {
+    const w = String(name || '').trim().split(/\s+/);
+    return w.length > 1 && /^\p{Lu}\p{L}{2,}$/u.test(w[0]) && !NOT_FIRST_NAMES.test(w[0]) ? w[0] : '';
+}
+/**
+ * Whether a person is in the text: by any of their names (any case), or by the first name of their main name (the
+ * first one given), capitalized, since "Lena" is how a story says "Lena Park".
+ */
+export function personNamedIn(text, names) {
+    if (namedIn(text, names)) return true;
+    const first = firstName(names[0]);
+    return !!first && new RegExp(`(?<![\p{L}\p{N}])${first}(?![\p{L}\p{N}])`, 'u').test(String(text || ''));
+}
+
 /** Every name a person goes by, for display: "Sasha (also Unit 114)". */
 export function akaOf(ledger, name) {
     const canon = aliasResolver(ledger);
@@ -184,6 +207,9 @@ export function buildLedgerMessages({ ledger, messages, userName, modes = [], ca
     // Only in a one-body story does a driver seen as themselves mean they left. (In a multipossession chat, the
     // possessor cooking dinner in his own body took the other bodies off the ledger.)
     else if (isSingleBody(modes)) parts.push('In this story a mind drives one body at a time, so a driver shown living as themselves in their own body (their own home, their own name and features) has left the body they were in: remove that row.');
+    // In a swap each body keeps its own name and home while the other mind drives it, so "Ben at Ben's house" is still
+    // Ana inside; the one-body rule above would read that as Ben back home.
+    if (modes.includes('Body Swap')) parts.push('With Body Swap, two minds trade bodies: each swapped body is driven by the other\'s mind (how "swap"), and the story keeps calling each body by its own name, in its own home and life. So a swapped body seen under its own name is still swapped; the swap ends, for both rows, only when the messages show it undone.');
     parts.push(`Current ledger:\n${JSON.stringify(normalizeLedger(ledger || EMPTY_LEDGER))}`);
     if (context.length) parts.push('Earlier messages, for context only (the ledger already reflects them):\n' + context.map(m => `### ${m.name}\n${clip(m.text, 1500)}`).join('\n\n'));
     parts.push((context.length ? 'New messages to apply' : 'Newest messages') + ', oldest first:\n' + messages.map(m => `### ${m.name}\n${clip(m.text, 2500)}`).join('\n\n'));
@@ -341,12 +367,14 @@ export const isSingleBody = (modes = []) => modes.length > 0 && !modes.some(m =>
 const KEEPS_OWN_BODY = ['Multipossession', 'Hive Mind'];
 
 /**
- * A ride the model labeled plain "possession" is a multipossession when that mode is on, and a hive mind in a story
- * whose only occupancy mode is Hive Mind. The label is what tells the rest of the ledger the mind kept its own body.
+ * A ride the model labeled plain "possession" is a multipossession when that mode is on, a hive mind in a story whose
+ * only occupancy mode is Hive Mind, and a swap in one whose only one is Body Swap. The label is what tells the rest of
+ * the ledger the mind kept its own body (or, for a swap, that its own body has the other mind in it).
  */
 export function labelMultiRides(ledger, modes = []) {
     const l = normalizeLedger(ledger);
-    const label = modes.includes('Multipossession') ? 'multipossession' : modes.includes('Hive Mind') && !modes.includes('Possession') ? 'hive mind' : '';
+    const only = m => modes.includes(m) && !modes.includes('Possession');
+    const label = modes.includes('Multipossession') ? 'multipossession' : only('Hive Mind') ? 'hive mind' : only('Body Swap') ? 'swap' : '';
     if (!label) return l;
     return { ...l, bodies: l.bodies.map(b => (b.driver && b.body && /^\s*(possession|possessed)?\s*$/i.test(b.how) ? { ...b, how: label } : b)) };
 }
@@ -510,7 +538,7 @@ export function keepRides(prev, next, kept) {
 
 // Modes the Ledger runs for: the ones where a mind inhabits a body that isn't its own. (Mind changes are left to the
 // Codex; Puppetry steers a body from outside.) Copy Fidelity and Reverse Vore bring in a mode on this list.
-export const LEDGER_MODES = ['Possession', 'Multipossession', 'Skinsuit', 'Hive Mind', 'Reverse Vore', 'Propagation', 'Copy Fidelity'];
+export const LEDGER_MODES = ['Possession', 'Multipossession', 'Skinsuit', 'Hive Mind', 'Reverse Vore', 'Propagation', 'Copy Fidelity', 'Body Swap'];
 export const tracksBodies = (modes = []) => modes.some(m => LEDGER_MODES.includes(m));
 
 const same = (a, b) => a.toLowerCase() === b.toLowerCase();
@@ -563,6 +591,11 @@ export function rosterOf(ledger, name) {
     ];
 }
 
+// A swap names people by who they are, not by the body (the Body Swap entry), so the naming rules, the pronoun check
+// and the pointer cut all leave swapped bodies out. A hidden swap is still written as each body's owner.
+export const isSwap = b => /swap/i.test(b?.how || '');
+const knownSwap = b => isSwap(b) && b.body && b.driver && b.user_knows !== 'no';
+
 // Each mechanism in its own words. A generic "driven by" on every row, every reply, read as someone operating a
 // body from outside and pulled scenes toward puppetry.
 const PLAIN_HOW = /^\s*(possession|possessed|skinsuit|skin|worn|hive( mind)?|copy|propagation|puppetry|puppet|swap|body swap|)\s*$/i;
@@ -609,11 +642,20 @@ function turnLine(roster, userName, lastUserText) {
         + `${list(idle)} ${one ? 'does' : 'do'} nothing new and ${one ? 'says' : 'say'} nothing: if anyone speaks to or waits on ${one ? idle[0] : 'any of them'}, write that person and stop there, leaving the answer to ${userName}.`;
 }
 
-/** The text injected into the prompt (depth 1). Empty string when there is nothing to say. */
-export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' } = {}) {
+/**
+ * The text injected into the prompt (depth 1). Empty string when there is nothing to say.
+ * Host sheets ride along: `sheets` maps a body's lowercased name to the short text on who that person is in their own
+ * life (persona-core.js), given under the body's row, and `back` lists people whose bodies were taken and are theirs
+ * again but who are still in the scene ({ body, text }), since the writer plays them again and needs them most then.
+ */
+// scene: the last few messages. Given, a taken body's sheet goes in only while the body is in the scene (named there, by
+// any of its names); its row always does. Left out (the /wh-ledger readout), every sheet goes in.
+export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '', sheets = new Map(), back = [], scene = null } = {}) {
     const l = normalizeLedger(ledger);
-    if (isEmptyLedger(l)) return '';
+    if (isEmptyLedger(l) && !back.length) return '';
     const lines = [];
+    const sheetOf = body => (body && (scene == null || personNamedIn(scene, [body, ...akaOf(l, body)])) ? sheets.get(lc(body)) : '');
+    const who = (body, text) => `  Who ${body} is in their own life: ${String(text).replace(/\s*\n\s*/g, ' ')}`;
     const hidden = [];
     const canon = aliasResolver(l);
     // What the player's bodies are busy with is for the roster only: given to the writer, it was an invitation to
@@ -631,7 +673,15 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' 
         if (b.notes) line += `. ${b.notes}`;
         if (b.doing && !players(b.driver)) line += `. Busy with: ${b.doing}`;
         if (b.user_knows === 'no' && body && b.driver) { line += `. HIDDEN from ${userName}`; hidden.push(b); }
+        // The player's own bodies are "you". Said on the row itself, since a chat that started under the old way
+        // (the body in third person) keeps pulling the reply back to it.
+        if (body && players(b.driver) && !same(b.driver, body)) {
+            const subj = String(b.pronouns || '').split('/')[0].trim().toLowerCase() || 'they';
+            const [poss, own] = { she: ['her', 'hers'], he: ['his', 'his'], they: ['their', 'theirs'] }[subj] || ['their', 'theirs'];
+            line += `. In the narration this body is "you", its parts too: "you lean on the desk", "your arms", "people smile at you", never "${body} leans", "${body}'s arms" or "${subj} leans", even where earlier replies wrote it that way. ${body}'s own things stay ${own} ("${body}'s phone", "${poss} bag"); only ${b.driver}'s own things are "your"`;
+        }
         lines.push(`- ${line}.`.replace(/\.\.$/, '.'));
+        if (body && b.driver && !same(b.driver, body) && sheetOf(body)) lines.push(who(body, sheetOf(body)));
     }
     const rules = [];
     const roster = rosterOf(l, userName);
@@ -658,6 +708,12 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' 
         const turn = turnLine(roster, userName, lastUserText);
         if (turn) rules.push(turn);
     }
+    const swapped = l.bodies.filter(knownSwap);
+    if (swapped.length) {
+        const people = [...new Set(swapped.map(b => b.driver))];
+        const ex = swapped[0];
+        rules.push(`${list(people)} ${people.length > 1 ? 'have' : 'has'} swapped bodies, and for them the narration follows the person, not the body, so it's always clear who is doing what: each keeps their own name and pronouns for what they do, say and think, and the narration says whose body it is wherever that helps ("${ex.driver} reaches out with ${ex.body}'s hand"). People who don't know about the swap still treat each body as its owner. This replaces the naming above for swapped bodies.`);
+    }
     for (const b of hidden) {
         const her = (b.pronouns.split('/')[0] || 'they').toLowerCase();
         rules.push(`${userName} doesn't know that ${b.body} is ${b.driver}. In narration ${her === 'they' ? 'they are' : `${her} is`} only ${b.body}, with ${b.body}'s own name and pronouns, and nothing mentions, hints at, or explains that anyone else is inside. ${b.driver}'s habits may show in what ${b.body} does, written as ${b.body}'s own behavior; only what ${userName} could actually notice reaches the page.`);
@@ -665,13 +721,18 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '' 
     const powers = l.powers.map(p => `${p.who}: ${p.power}`).join('; ');
     const aliases = l.aliases.map(a => `${a.name} = ${a.aka.join(' = ')}`).join('; ');
     const hasBodies = l.bodies.length > 0 || lines.length > 0;
+    const anySheet = lines.some(x => x.startsWith('  Who ')) || back.length > 0;
+    // The player is "you" in every body they drive; the two-referent rule is for bodies someone else drives.
+    const playerDrives = l.bodies.some(b => b.body && b.body.toLowerCase() !== 'none' && players(b.driver) && !same(b.body, b.driver));
     return [
         '<body_ledger>',
         ...(hasBodies ? [
-            `Who is in which body right now. Where ${userName} knows, everything the world sees of a body uses that body's own name and pronouns, and anything about the mind inside it (what it wants, decides, thinks, or is) uses the mind's own name and pronouns. Either way, that mind's habits show as the body's own behavior, written plainly, with no narration pointing out who is inside.`,
+            `Who is in which body right now. Where ${userName} knows, everything the world sees of a body uses that body's own name and pronouns, and anything about the mind inside it (what it wants, decides, thinks, or is) uses the mind's own name and pronouns. Either way, that mind's habits show as the body's own behavior, written plainly, with no narration pointing out who is inside.${playerDrives ? ` In a body ${userName} drives, the narration calls ${userName} "you" for everything instead, and uses the body's name only to say which body.` : ''}`,
             ...lines,
             `Everyone else, ${userName} included unless listed, is in their own body.`,
         ] : []),
+        ...(anySheet ? [`A "Who … is in their own life" line says who that person is to the people around them: their world, work and habits stay true to it. While someone else drives their body it isn't how the body acts; once they're back in it, it is.`] : []),
+        ...(back.length ? ['Back in their own bodies and still in the scene, so you play them again:', ...back.map(x => `- ${x.body}.\n${who(x.body, x.text)}`)] : []),
         ...(aliases ? [`Same person, different names: ${aliases}.`] : []),
         ...(powers ? [`Powers: ${powers}.`] : []),
         ...rules,
@@ -700,7 +761,14 @@ export function buildLintMessages(text, ledger, userName = 'the player') {
         }
         rules.push(`- BODIES IN SYNC. Narration in which two or more of ${list(bodies)} do the same thing at the same moment, move in unison, mirror each other, or speak in chorus ("both glance over at the same instant", "all four speaking at once", "in perfect sync"). Cut the sentence or clause that describes it. Different bodies doing different things at once is correct and stays. Leave it only if the story shows ${g.driver} is new to the ability.`);
     }
-    rules.push('- POINTERS. Narration that points out someone else is inside a body: "Marcus\'s mannerism on her face", "his smile on her mouth", "her borrowed face", "someone else\'s mouth", "a smile that isn\'t hers", "something behind her eyes", "the amusement doesn\'t reach her eyes", "the same grin on three faces", "Victor\'s cadence makes it unsettling", bodies moving in eerie unison. Cut only the pointing words and keep the action: from "Dana rolls her eyes—Marcus\'s mannerism on her face." cut "—Marcus\'s mannerism on her face"; from "Cole\'s borrowed eyes go wide." cut just "borrowed " so it reads "Cole\'s eyes go wide."');
+    // Swapped bodies are named through the person inside on purpose, so the pointer cut leaves them alone.
+    const swaps = [...new Set(l.bodies.filter(knownSwap).map(b => b.body))];
+    if (swaps.length) rules.push(`- Never cut narration about ${list(swaps)}: they are in a body swap, where naming the person inside and whose body they're in is how the story stays clear ("Rika plants Rowan's big hand on the counter").`);
+    // The player is "you" in every body they drive, and naming the body is how a sentence says which one.
+    const canon = aliasResolver(l);
+    const mine = [...new Set(l.bodies.filter(b => b.body && b.driver && canon(b.driver) === canon(userName) && !same(b.body, b.driver)).map(b => b.body))];
+    if (mine.length) rules.push(`- Never cut narration that calls ${userName} "you" in ${list(mine)}, or that names the body to say which one "you" are moving ("as ${mine[0]}, you pour") or whose things they are ("${mine[0]}'s phone"): that is how the story talks about ${userName}'s own bodies. Words like "borrowed" or "isn't hers" still get cut.`);
+    if (l.bodies.some(b => b.body && b.driver && !same(b.body, b.driver) && !knownSwap(b))) rules.push('- POINTERS. Narration that points out someone else is inside a body: "Marcus\'s mannerism on her face", "his smile on her mouth", "her borrowed face", "someone else\'s mouth", "a smile that isn\'t hers", "something behind her eyes", "the amusement doesn\'t reach her eyes", "the same grin on three faces", "Victor\'s cadence makes it unsettling", bodies moving in eerie unison. Cut only the pointing words and keep the action: from "Dana rolls her eyes—Marcus\'s mannerism on her face." cut "—Marcus\'s mannerism on her face"; from "Cole\'s borrowed eyes go wide." cut just "borrowed " so it reads "Cole\'s eyes go wide."');
     for (const b of l.bodies.filter(b => b.user_knows === 'no' && b.body && b.driver)) {
         const aka = akaOf(l, b.driver);
         rules.push(`- SECRETS. ${userName} does not know that ${b.body} is being driven by ${b.driver}${aka.length ? ` (also called ${aka.join(', ')})` : ''}. Cut narration that reveals or hints at it (naming ${b.driver} as the one inside ${b.body}, "possessed", "inside her", "wearing her", "piloting").`);
@@ -796,6 +864,9 @@ export function applyCuts(text, cuts) {
 export const PRONOUNS = new Set('he him his himself she her hers herself they them their theirs themself themselves'.split(' '));
 
 /** True when at least one body is driven by a mind with a different name or different pronouns. */
+/** Whether the pronoun check has anything to look at: a body driven by someone else, other than in a known swap. */
+export const needsPronounCheck = ledger => normalizeLedger(ledger).bodies.some(b => b.body && b.driver && !same(b.body, b.driver) && !knownSwap(b));
+
 export function hasCrossedBodies(ledger) {
     return normalizeLedger(ledger).bodies.some(b => b.body && b.driver && !same(b.body, b.driver));
 }
@@ -817,7 +888,7 @@ FIX: <the sentence with only the pronouns or names changed>`;
 
 export function buildPronounMessages(text, ledger) {
     const l = normalizeLedger(ledger);
-    const map = l.bodies.filter(b => b.body && b.driver && !same(b.body, b.driver))
+    const map = l.bodies.filter(b => b.body && b.driver && !same(b.body, b.driver) && !knownSwap(b))
         .map(b => `- The body of ${b.body} (${b.pronouns || '?'}) is driven by ${b.driver} (${b.driver_pronouns || '?'}).`).join('\n');
     return [
         { role: 'system', content: PRONOUN_SYSTEM },

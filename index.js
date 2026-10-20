@@ -20,20 +20,25 @@ import { loadWorldInfo, saveWorldInfo, updateWorldInfoList, world_names } from '
 import { looksLikeRoleplay } from './text-core.js';
 import { MODE_GROUPS, MODIFIERS, PARENT, ALL_MODES, MODE_BLURBS, expandModes, planEntry, buildSuggestMessages, parseSuggestResponse, DISPLAY_SCRIPTS } from './codex-core.js';
 import {
-    EMPTY_LEDGER, normalizeLedger, buildLedgerMessages, parseLedger, parseLedgerUpdate, verifyNewRides, verifyEndedRides, renderLedger, akaOf, aliasResolver,
+    EMPTY_LEDGER, normalizeLedger, buildLedgerMessages, parseLedger, parseLedgerUpdate, verifyNewRides, verifyEndedRides, renderLedger, akaOf, aliasResolver, personNamedIn,
     labelMultiRides, rosterOf, tracksBodies,
-    hasCrossedBodies, buildPronounMessages, parsePronounResponse, applyPronounFixes, buildLintMessages, parseLintResponse, applyCuts,
+    hasCrossedBodies, needsPronounCheck, buildPronounMessages, parsePronounResponse, applyPronounFixes, buildLintMessages, parseLintResponse, applyCuts,
     endedRides, bodyHistory, renderHistory, historyGroups, buildHistoryMessages, parseHistoryResponse,
 } from './ledger-core.js';
 import { parseBuilderChat, buildCard, doctorCard, buildReviewMessages, estimateTokens } from './card-core.js';
-import { MIND_MODES, KINDS as MIND_KINDS, STAGES as MIND_STAGES, EMPTY_BOOK, normalizeBook, isEmptyBook, needsUpdate, buildMindMessages, applyMindUpdate, renderMindBook, trappedSelfCuts, resistanceSetUp } from './mind-core.js';
+import { describesMinor, buildPersonaMessages, parsePersona, personaText, personaKey, sheetFromFields, buildLookMessages, parseLook, portraitPrompt } from './persona-core.js';
+import { ledgerView, mindView, pictureView } from './views.js';
+import { user_avatar } from '../../../personas.js';
+import { MIND_MODES, KINDS as MIND_KINDS, EMPTY_BOOK, normalizeBook, isEmptyBook, needsUpdate, buildMindMessages, applyMindUpdate, renderMindBook, trappedSelfCuts, resistanceSetUp } from './mind-core.js';
 
 const MODULE = 'worldhopper';
 const LOG = '[Worldhopper]';
 const LEDGER_KEY = 'worldhopper_ledger';
 const HISTORY_KEY = 'worldhopper_history';
 const HISTORY_DEPTH = 4;   // background, so a little further back than the Ledger at depth 1
+const PERSONA_KEY = 'worldhopper_personas';   // the host sheets, in chat metadata
 const REVIEW_TIMEOUT_MS = 180000;   // Check card's deeper review: a slow model takes about a minute; past three, give up
+const SCENE_MESSAGES = 4;   // who is "in the scene": named in this many of the latest messages
 const RECENT_REPLIES = 30;   // "Build history" can read just this many of the latest replies instead of the whole chat
 const IN_CHAT = 1;   // extension_prompt_types.IN_CHAT
 const SYSTEM = 0;    // extension_prompt_roles.SYSTEM
@@ -41,10 +46,14 @@ const DEFAULTS = {
     // Worldhopper on or off (the switch in its heading). Off, nothing is added to prompts and no model runs; what's
     // already in the chat (moment boxes, badges, ⟲) still shows.
     enabled: true,
-    codex: { world: 'WH Metaphysics', initiative: true, selections: {}, suggested: {}, installedHash: '' },
+    codex: { world: 'WH Metaphysics', selections: {}, suggested: {}, installedHash: '' },
     // Connection profiles, picked under Settings → Models. The Ledger runs after every reply, so a fast model suits
     // it; history notes need judgment about who remembers what, so a stronger model suits them.
     ledger: { enabled: true, lanesCompact: false, profile: '', notesProfile: '' },
+    // Pictures of people in the Ledger and the Mind Book, drawn by Image Generation as it's set up. auto draws them on
+    // their own; style, model and workflow ('' = as set in Image Generation) and shape apply to these pictures only.
+    // rewrite has Image Generation's own prompt template rewrite the prompt first (for tag-based models).
+    pictures: { auto: false, style: '', model: '', workflow: '', shape: 'square', rewrite: false },
 };
 
 const ctx = () => SillyTavern.getContext();
@@ -65,8 +74,14 @@ function settings() {
     // Before 0.2 the Ledger used the Editor's model; keep it that way for existing setups.
     if (!hadLedgerProfile) s.ledger.profile = s.editor?.profile || '';
     // These used to be switches and are simply part of Worldhopper now; the heading's switch turns everything off.
-    for (const k of ['enabled', 'anchors', 'details', 'suggest']) delete s.codex[k];
-    for (const k of ['strip', 'badges', 'lanes', 'history']) delete s.ledger[k];
+    // "Powers get used" too: characters always use their powers now (⛓ Initiative Anchor comes with any mode).
+    for (const k of ['enabled', 'anchors', 'details', 'suggest', 'initiative']) delete s.codex[k];
+    s.pictures = { ...DEFAULTS.pictures, ...(s.pictures || {}) };
+    // Host portraits (DEV builds) are Pictures now.
+    if ('portraits' in s.ledger) s.pictures.auto = !!s.ledger.portraits;
+    if (s.ledger.portraitWorkflow) s.pictures.workflow ||= s.ledger.portraitWorkflow;
+    // Host personas too: their sheets are part of the Ledger now.
+    for (const k of ['strip', 'badges', 'lanes', 'history', 'personas', 'portraits', 'portraitWorkflow']) delete s.ledger[k];
     // s.editor is left as it was: the WH Editor (its own extension now) takes its settings from there once.
     return s;
 }
@@ -176,7 +191,7 @@ async function onEntriesLoaded(lore) {
     for (const list of lists) {
         for (const e of list) {
             if (e.world !== s.world) continue;
-            const plan = planEntry(e.comment, active, { initiative: s.initiative });
+            const plan = planEntry(e.comment, active);
             if (plan === 'constant') { e.disable = false; e.constant = true; n++; }
             else if (plan === 'keyed') { e.disable = false; n++; }
         }
@@ -597,7 +612,11 @@ function applyLedgerInjection(type) {
     let lastUserText = '';
     for (let i = limit - 1; i >= 0; i--) if (chat[i]?.is_user) { lastUserText = chat[i].mes; break; }
     const bodies = ledgerWanted();
-    const text = bodies && head ? renderLedger(head.ledger, c.name1 || 'User', { lastUserText }) : '';
+    // Who is in the scene: anyone named in the last few messages. Only they get their host sheet or their full Mind Book
+    // entry, so a long chat full of hosts and hypnotized people doesn't grow the prompt every reply.
+    const scene = chat.slice(Math.max(0, limit - SCENE_MESSAGES), limit).filter(inStory).map(m => m.mes).join('\n');
+    // Each taken body's row carries who its owner is in their own life, and hosts released but still in the scene follow.
+    const text = bodies && head ? renderLedger(head.ledger, c.name1 || 'User', { lastUserText, scene, ...hostSheets(head.ledger, chat, limit) }) : '';
     c.setExtensionPrompt(LEDGER_KEY, text, IN_CHAT, 1, false, SYSTEM);
     c.setExtensionPrompt(HISTORY_KEY, bodies ? historyText(limit) : '', IN_CHAT, HISTORY_DEPTH, false, SYSTEM);
     // The Mind Book, with the watcher lines for the reply about to be written: your newest message, and the scene
@@ -605,7 +624,727 @@ function applyLedgerInjection(type) {
     const kinds = mindKinds();
     const mind = kinds.length ? headMind(limit) : null;
     const recent = chat.slice(Math.max(0, limit - 2), limit).filter(inStory).map(m => m.mes).join('\n');
-    c.setExtensionPrompt(MIND_KEY, mind ? renderMindBook(mind.book, c.name1 || 'User', { kinds, latest: lastUserText, recent }) : '', IN_CHAT, 1, false, SYSTEM);
+    c.setExtensionPrompt(MIND_KEY, mind ? renderMindBook(mind.book, c.name1 || 'User', { kinds, latest: lastUserText, recent, scene }) : '', IN_CHAT, 1, false, SYSTEM);
+}
+
+// ------------------------------------------------------------------ Host personas
+
+// A short sheet per body someone else has taken (persona-core.js), part of the Body Ledger: written once, the first time
+// the Ledger shows the body taken, with the notes model; kept in the chat's metadata; given to the model under the body's
+// Ledger row while it's occupied, and after it's released while that person is still in the scene.
+// Bodies with a card of their own (you, the card's character, group members) already have one and are skipped.
+const personaMap = () => ctx().chatMetadata?.[PERSONA_KEY] || {};
+const reEsc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const same = (a, b) => personaKey(a) === personaKey(b);
+async function saveChatMeta() {
+    const c = ctx();
+    if (c.saveMetadata) await c.saveMetadata(); else c.saveMetadataDebounced?.();
+}
+function cardNames() {
+    const c = ctx();
+    const names = new Set([c.name1, c.name2].filter(Boolean).map(personaKey));
+    const g = c.groupId ? c.groups?.find(x => x.id === c.groupId) : null;
+    for (const av of g?.members || []) { const ch = c.characters?.find(x => x.avatar === av); if (ch) names.add(personaKey(ch.name)); }
+    return names;
+}
+/** The character card by this name in this chat (its character, or a group member), if there is one. */
+function cardCharacter(name) {
+    const c = ctx();
+    const g = c.groupId ? c.groups?.find(x => x.id === c.groupId) : null;
+    const avatars = g ? g.members || [] : [c.characters?.[c.characterId]?.avatar].filter(Boolean);
+    return avatars.map(av => c.characters?.find(x => x.avatar === av)).find(ch => ch && same(ch.name, name)) || null;
+}
+/**
+ * Hosts who have been released but are still in the scene (named in the last few messages before limit): the model
+ * plays that person again, so their sheet matters most then. A body still in the Ledger (taken, or empty) isn't back.
+ */
+function hostsBack(ledger, chat, limit) {
+    const taken = new Set((ledger?.bodies || []).filter(b => b.body).map(b => personaKey(b.body)));
+    const skip = cardNames();
+    const recent = chat.slice(Math.max(0, limit - SCENE_MESSAGES), limit).filter(inStory).map(m => m.mes).join('\n');
+    return Object.values(personaMap()).filter(e => e.sheet && !taken.has(personaKey(e.body)) && !skip.has(personaKey(e.body)) && personNamedIn(recent, [e.body]));
+}
+
+/** The sheets renderLedger puts in the prompt: { sheets: body → sheet text for the taken bodies, back: [{ body, text }] }. */
+function hostSheets(ledger, chat, limit) {
+    const sheets = new Map();
+    for (const b of takenBodies(ledger)) {
+        const e = personaMap()[personaKey(b.body)];
+        if (e?.sheet) sheets.set(personaKey(b.body), personaText(e.sheet));
+    }
+    return { sheets, back: hostsBack(ledger, chat, limit).map(e => ({ body: e.body, text: personaText(e.sheet) })) };
+}
+
+/** Ledger rows for bodies someone else is driving right now, minus the ones with a card of their own. */
+function takenBodies(ledger) {
+    const skip = cardNames();
+    return (ledger?.bodies || []).filter(b => b.body && b.driver && b.body.toLowerCase() !== 'none' && !skip.has(personaKey(b.body)));
+}
+const isTaken = name => takenBodies(headLedger()?.ledger).some(b => same(b.body, name));
+
+const personaJobs = new Set();
+/** Writes a sheet for every taken body that has none yet. Runs beside the reply queue, like Body History notes. */
+async function ensurePersonas() {
+    if (!ledgerWanted() || !notesProfile()) return;
+    const key = chatKey();
+    const head = headLedger();
+    if (!head) return;
+    // A sheet deleted while its body was taken stays deleted for that ride only.
+    const map = personaMap();
+    const taken = new Set(takenBodies(head.ledger).map(b => personaKey(b.body)));
+    const over = Object.keys(map).filter(k => map[k]?.removed && !taken.has(k));
+    if (over.length) { for (const k of over) delete map[k]; await saveChatMeta(); }
+    for (const row of takenBodies(head.ledger)) {
+        const id = `${key}|${personaKey(row.body)}`;
+        if (personaMap()[personaKey(row.body)] || personaJobs.has(id)) continue;
+        personaJobs.add(id);
+        try { await writePersona(row, key); } finally { personaJobs.delete(id); }
+    }
+}
+
+async function writePersona(row, key = chatKey()) {
+    const c = ctx();
+    const chat = (c.chat || []).filter(inStory);
+    const name = row.body;
+    const named = new RegExp(`\\b${reEsc(name)}\\b`, 'i');
+    // The latest messages, plus the last few that name the body even if they're further back.
+    const picked = new Set([...chat.filter(m => named.test(m.mes)).slice(-6), ...chat.slice(-10)]);
+    const msgs = chat.filter(m => picked.has(m)).slice(-14).map(m => ({ name: speakerName(m), text: m.mes }));
+    const t = selectionTarget();
+    ledgerStatus(`Writing a host persona for ${name}…`);
+    let text;
+    try {
+        text = await askProfile(notesProfile(), buildPersonaMessages({ body: name, row, card: t?.character ? cardText(t.character) : '', messages: msgs, userName: c.name1 || 'User' }), 2000, 0.4);
+    } catch { ledgerStatus(`Host persona for ${name} skipped: ${unreachable(notesProfile())}.`); return; }
+    const sheet = parsePersona(text);
+    if (!sheet) { ledgerStatus(describesMinor(text) ? `Host persona for ${name} not kept: it described them as a minor.` : `Host persona for ${name}: the model's answer was unreadable.`); return; }
+    if (chatKey() !== key) return;
+    await setSheet(name, sheet);
+    ledgerStatus(`Host persona written for ${name}.`);
+    applyLedgerInjection();
+    renderLedgerPanel();
+}
+
+/**
+ * Sets a host's sheet, or deletes it (null). A sheet deleted while someone is still in the body leaves a mark, so no new
+ * one is written after the next reply; the next time that person is taken, they get a fresh one.
+ */
+async function setSheet(name, sheet, { taken = false } = {}) {
+    const meta = ctx().chatMetadata;
+    meta[PERSONA_KEY] ??= {};
+    const map = meta[PERSONA_KEY];
+    const k = personaKey(name);
+    const prev = map[k];
+    if (sheet) map[k] = { body: name, sheet, at: Date.now() };
+    else if (prev?.sheet && taken) map[k] = { body: prev.body, removed: true, at: Date.now() };
+    else delete map[k];
+    await saveChatMeta();
+}
+
+/** A body renamed in its card takes its sheet and its picture along, unless the new name already has one. */
+function movePerson(from, to) {
+    const meta = ctx().chatMetadata;
+    for (const store of [meta?.[PERSONA_KEY], meta?.[PICTURE_KEY]]) {
+        if (!store) continue;
+        const a = personaKey(from), b = personaKey(to);
+        if (a === b || !store[a] || store[b]) continue;
+        store[b] = { ...store[a], ...('body' in store[a] ? { body: to } : { name: to }) };
+        delete store[a];
+    }
+}
+
+/**
+ * A SillyTavern persona from a host's sheet and picture, to play as in this chat or any other. Made through SillyTavern's
+ * own /persona-create, so it's a persona like any other; the description (built from the sheet) can be changed first.
+ */
+async function makePersona(name) {
+    const c = ctx();
+    const e = personaMap()[personaKey(name)];
+    if (!e?.sheet) return;
+    const create = c.SlashCommandParser?.commands?.['persona-create'];
+    if (!create) { toastr.warning("This SillyTavern can't make personas from an extension yet (no /persona-create): update SillyTavern."); return; }
+    const row = (headLedger()?.ledger?.bodies || []).find(b => same(b.body, name));
+    const text = `${name}${row?.pronouns ? ` (${row.pronouns})` : ''}
+${personaText(e.sheet)}`;
+    const again = Object.values(c.powerUserSettings?.personas || {}).some(n => same(n, name));
+    const picture = pictureOf(name);
+    const head = `<h3>Make a persona: ${esc(name)}</h3><small>A persona you can pick in Persona Management, for this chat or any other${picture ? ', with their picture' : ''}. Change the description first if you like.${again ? ` You already have a persona named ${esc(name)}; this makes another.` : ''}</small>`;
+    const res = await c.callGenericPopup(head, c.POPUP_TYPE.INPUT, text, { rows: 8, wide: true, okButton: 'Make it', cancelButton: 'Cancel' });
+    if (typeof res !== 'string' || !res.trim()) return;
+    try {
+        // SillyTavern says it was made; it shows up in Persona Management.
+        await create.callback({ name, description: res.trim(), title: 'Worldhopper host', avatar: picture, select: 'false', avatarPromptResize: 'false' }, '');
+    } catch (err) {
+        console.warn(LOG, err);
+        toastr.error(`Couldn't make the persona: ${String(err.message || err).slice(0, 160)}`);
+    }
+}
+
+async function rewritePersona(name) {
+    const head = headLedger();
+    const row = head?.ledger?.bodies?.find(b => same(b.body, name)) || { body: name };
+    await writePersona(row);
+}
+
+// ------------------------------------------------------------------ Pictures
+
+// A picture for anyone in the Ledger or the Mind Book without a card of their own (people with a card show its avatar),
+// drawn by SillyTavern's Image Generation however it's set up: whatever source, model, workflow and style it uses, with
+// the choices under Settings → Pictures laid over it for these pictures only. Drawn when you tap someone's face, or on
+// their own with "Draw pictures on their own" (off by default). Drawn from a look: a host's sheet has one; anyone else
+// gets one written for the picture by the notes model, or typed by you. Kept in the chat's metadata; the files live in
+// their own folder of SillyTavern's images, so a replaced or removed one can be deleted without touching anything else.
+const PICTURE_KEY = 'worldhopper_pictures';
+const PICTURE_FOLDER = 'Worldhopper pictures';
+const OUR_FOLDERS = [PICTURE_FOLDER, 'Worldhopper hosts'];   // the second from DEV builds before 1.3.0
+
+function pictureMap(create = false) {
+    const meta = ctx().chatMetadata;
+    if (!meta) return {};
+    // DEV builds before 1.3.0 kept a host's picture on their sheet.
+    const legacy = Object.entries(meta[PERSONA_KEY] || {}).filter(([, e]) => e?.image);
+    if (create || legacy.length) meta[PICTURE_KEY] ??= {};
+    for (const [k, e] of legacy) { meta[PICTURE_KEY][k] ??= { name: e.body, image: e.image }; delete e.image; }
+    return meta[PICTURE_KEY] || {};
+}
+const pictureOf = name => pictureMap()[personaKey(name)]?.image || '';
+/** What their picture is drawn from: their sheet's Look, else a look of its own. */
+function lookOf(name) {
+    const fromSheet = personaMap()[personaKey(name)]?.sheet?.Look;
+    return fromSheet ? { look: fromSheet, fromSheet: true } : { look: pictureMap()[personaKey(name)]?.look || '', fromSheet: false };
+}
+/** A card's face: the avatar of someone with a card of their own, else their picture, which a tap draws or changes. */
+function faceFor(name, kind = 'idle') {
+    const c = ctx();
+    const k = personaKey(name);
+    if (!k) return {};
+    if (same(name, c.name1)) return { image: user_avatar ? c.getThumbnailUrl('persona', user_avatar) : '' };
+    const ch = cardCharacter(name);
+    if (ch) return { image: c.getThumbnailUrl('avatar', ch.avatar) };
+    return { image: pictureOf(name), busy: viewBusy.get(`pic:${k}`) || '', open: () => openPicture(name, kind) };
+}
+
+/** Image Generation is on (its /imagine command is there). */
+const imageGenOn = () => !!ctx().extensionSettings?.sd && !!ctx().SlashCommandParser?.commands?.imagine;
+/** One of Image Generation's own settings, when it applies to the source it's set to (going by its settings panel). */
+function sdControl(id) {
+    const node = $(`#${id}`);
+    if (!node.length) return null;
+    const scope = node.closest('[data-sd-source]').attr('data-sd-source');
+    return !scope || scope.split(',').includes(ctx().extensionSettings.sd?.source) ? node : null;
+}
+const sdOptions = id => (sdControl(id)?.find('option').map((_, o) => ({ value: o.value, label: o.textContent.trim() })).get() || []).filter(o => o.value);
+const sdHas = (id, value) => sdOptions(id).some(o => o.value === value);
+
+// A face is shown small, and most image models (and their LoRAs) are made for about 1 megapixel: drawn much bigger, a
+// LoRA's look can wash out entirely. So a square picture is never asked for above 1024 a side.
+const MAX_SIDE = 1024;
+
+// One picture at a time: each lays its choices over Image Generation's settings and puts back what it found, so two at
+// once would leave the first one's choices behind for good.
+let drawing = Promise.resolve();
+function imagine(prompt) {
+    const run = drawing.then(() => imagineNow(prompt));
+    drawing = run.catch(() => {});
+    return run;
+}
+
+/**
+ * Draws a picture through Image Generation as it's set up, with the choices under Settings → Pictures laid over it for
+ * this one picture and put back right after. Returns { url ('' when nothing came back), side (the square asked for, or 0) }.
+ */
+async function imagineNow(prompt) {
+    const c = ctx();
+    if (!imageGenOn()) throw new Error('Image Generation is off: turn it on under Extensions → Image Generation and pick a source');
+    const sd = c.extensionSettings.sd;
+    const p = settings().pictures;
+    // With no chat model to rewrite it, Image Generation draws the word "undefined" instead.
+    if (p.rewrite && (!c.onlineStatus || c.onlineStatus === 'no_connection')) throw new Error('Prompt is set to "Rewritten by Image Generation", which needs your chat model connected');
+    const was = {};
+    const set = (k, v) => { if (!(k in was)) was[k] = sd[k]; sd[k] = v; };
+    const style = p.style && sd.styles?.find(x => x.name === p.style);
+    if (style) { set('prompt_prefix', style.prefix || ''); set('negative_prompt', style.negative || ''); }
+    // A "pov" in the prefix is there for scene pictures; a picture of someone shows them.
+    if (typeof sd.prompt_prefix === 'string') set('prompt_prefix', sd.prompt_prefix.split(',').filter(t => !/^\s*pov\s*$/i.test(t)).join(','));
+    if (p.workflow && sdHas('sd_comfy_workflow', p.workflow)) set('comfy_workflow', p.workflow);
+    // The prompt goes in as written, unless it's to be rewritten by Image Generation's own prompt template (through your
+    // chat model), which tag-based models need.
+    const args = ['quiet=true', `extend=${p.rewrite ? 'true' : 'false'}`, 'edit=false'];
+    if (p.model && !p.model.includes('"') && sdHas('sd_model', p.model)) args.push(`model="${p.model}"`);
+    const side = p.shape === 'square' && sd.width > 0 && sd.height > 0 ? Math.min(sd.width, sd.height, MAX_SIDE) : 0;
+    if (side) args.push(`width=${side}`, `height=${side}`);
+    try {
+        const r = await c.executeSlashCommandsWithOptions(`/imagine ${args.join(' ')} ${String(prompt).replace(/"/g, '')}`, { handleExecutionErrors: false, handleParserErrors: false });
+        return { url: String(r?.pipe || ''), side };
+    } finally {
+        Object.assign(sd, was);
+        c.saveSettingsDebounced();
+    }
+}
+
+const dataUrlOf = blob => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(r.error); r.readAsDataURL(blob); });
+/** Saves picture data (base64) in the pictures' folder; returns its path. */
+async function savePictureFile(data, format, name) {
+    const saved = await fetch('/api/images/upload', { method: 'POST', headers: ctx().getRequestHeaders(), body: JSON.stringify({ image: data, format, ch_name: PICTURE_FOLDER, filename: `${String(name).replace(/[^\p{L}\p{N}]+/gu, '_')}_${Date.now()}` }) });
+    if (!saved.ok) throw new Error('could not save the picture');
+    return (await saved.json()).path || '';
+}
+async function deleteImage(url) {
+    try { await fetch('/api/images/delete', { method: 'POST', headers: ctx().getRequestHeaders(), body: JSON.stringify({ path: url }) }); } catch { /* already gone */ }
+}
+/** Deletes a picture file, but only one in the pictures' own folder. */
+async function deletePictureFile(url) {
+    if (url && OUR_FOLDERS.some(f => String(url).includes(`/${f}/`))) await deleteImage(url);
+}
+/** Image Generation saves into the character's folder; the picture moves to ours, so it can be replaced or removed safely. */
+async function adoptPicture(url, name) {
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return url;
+        const m = (await dataUrlOf(await res.blob())).match(/^data:image\/([\w.+-]+);base64,(.+)$/);
+        if (!m) return url;
+        const mine = await savePictureFile(m[2], m[1] === 'jpeg' ? 'jpg' : m[1], name);
+        if (mine && String(url).includes('/user/images/')) await deleteImage(url);
+        return mine || url;
+    } catch { return url; }
+}
+/**
+ * Puts a picture on someone (or takes it off, with '') and deletes the one it replaces. One you took off stays off:
+ * "Draw pictures on their own" leaves that person alone until you draw or add one yourself.
+ */
+async function setPicture(name, url) {
+    const map = pictureMap(true);
+    const k = personaKey(name);
+    const old = map[k]?.image;
+    map[k] = { ...(map[k] || {}), name };
+    if (url) { map[k].image = url; delete map[k].keepEmpty; } else { delete map[k].image; map[k].keepEmpty = true; }
+    await saveChatMeta();
+    renderLedgerPanel();
+    refreshViews('picture');
+    if (old && old !== url) await deletePictureFile(old);
+}
+
+/** A look for someone without a sheet, written by the notes model from the card and the chat; '' when it can't be. */
+async function writeLook(name, key = chatKey()) {
+    if (!notesProfile()) { ledgerStatus(`Picture of ${name}: write their look first (✏️ by Look, under their picture), or pick a Notes model under Settings → Models.`); return ''; }
+    const c = ctx();
+    const chat = (c.chat || []).filter(inStory);
+    const named = new RegExp(`(?<![\\p{L}\\p{N}])${reEsc(name)}(?![\\p{L}\\p{N}])`, 'iu');
+    const picked = new Set([...chat.filter(m => named.test(m.mes)).slice(-6), ...chat.slice(-6)]);
+    const msgs = chat.filter(m => picked.has(m)).slice(-10).map(m => ({ name: speakerName(m), text: m.mes }));
+    const t = selectionTarget();
+    ledgerStatus(`Describing ${name} for their picture…`);
+    let text;
+    try { text = await askProfile(notesProfile(), buildLookMessages({ name, card: t?.character ? cardText(t.character) : '', messages: msgs, userName: c.name1 || 'User' }), 1200, 0.4); }
+    catch { ledgerStatus(`Picture of ${name} skipped: ${unreachable(notesProfile())}.`); return ''; }
+    const look = parseLook(text, name);
+    if (!look) { ledgerStatus(describesMinor(text) ? `Picture of ${name} not drawn: the look described them as a minor.` : `Picture of ${name}: the model's answer was unreadable.`); return ''; }
+    if (chatKey() !== key) return '';
+    const map = pictureMap(true);
+    map[personaKey(name)] = { ...(map[personaKey(name)] || {}), name, look };
+    await saveChatMeta();
+    return look;
+}
+
+const imageSize = url => new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve(null);
+    img.src = url;
+});
+let sizeTipShown = false;
+/**
+ * A setup that sets its own size (a workflow can) ignores the square asked for, and a picture far bigger than a model
+ * was made for can lose its look. Said once a session, when a square was asked for and the picture came back not
+ * square, or well over a megapixel. (A square of its own at about a megapixel is just right, whatever was asked.)
+ */
+async function checkPictureSize(url, side) {
+    if (!side || sizeTipShown) return;
+    const got = await imageSize(url);
+    if (!got) return;
+    const square = Math.abs(got.w - got.h) <= Math.max(got.w, got.h) * 0.1;
+    const mp = (got.w * got.h) / 1e6;
+    if (square && mp <= 1.6) return;
+    sizeTipShown = true;
+    toastr.info(`This picture came back ${got.w}×${got.h}${square ? '' : ', not square'}${mp > 1.6 ? `, ${mp.toFixed(1)} megapixels` : ''}: your Image Generation setup sets its own size. Pictures look best square at about 1 megapixel, and much bigger a LoRA's look can wash out. If yours uses a workflow, give pictures one of their own under Settings → Pictures → Workflow.`, 'Worldhopper', { timeOut: 20000, extendedTimeOut: 10000 });
+}
+
+async function drawPicture(name, key = chatKey()) {
+    const look = lookOf(name).look || await writeLook(name, key);
+    if (!look || chatKey() !== key) return;
+    ledgerStatus(`Drawing ${name}…`);
+    let drawn;
+    try { drawn = await imagine(portraitPrompt(look, name)); } catch (err) { console.warn(LOG, err); ledgerStatus(`Picture of ${name}: ${String(err.message || err).slice(0, 160)}.`); return; }
+    if (!drawn.url) { ledgerStatus(`Picture of ${name}: Image Generation returned nothing. Is it set up (Extensions → Image Generation)?`); return; }
+    const url = await adoptPicture(drawn.url, name);
+    if (chatKey() !== key) { await deletePictureFile(url); return; }
+    await setPicture(name, url);
+    ledgerStatus(`Picture drawn for ${name}.`);
+    await checkPictureSize(url, drawn.side);
+}
+
+/** A picture of your own, from a file picker. */
+function uploadPicture(name, key = chatKey()) {
+    const input = $('<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>');
+    input.on('cancel', () => input.remove()).on('change', async function () {
+        const file = this.files?.[0];
+        input.remove();
+        if (!file) return;
+        try {
+            const m = (await dataUrlOf(file)).match(/^data:image\/([\w.+-]+);base64,(.+)$/);
+            if (!m) throw new Error('that file is not a picture');
+            const url = await savePictureFile(m[2], m[1] === 'jpeg' ? 'jpg' : m[1], name);
+            if (chatKey() !== key) { await deletePictureFile(url); return; }
+            await setPicture(name, url);
+        } catch (err) { toastr.warning(`Picture of ${name}: ${String(err.message || err).slice(0, 160)}`); }
+    });
+    $('body').append(input);
+    input.trigger('click');
+}
+
+async function removePicture(name) {
+    const c = ctx();
+    if (!pictureOf(name)) return;
+    const ok = await c.callGenericPopup(`Remove ${name}'s picture?`, c.POPUP_TYPE.CONFIRM, '', { okButton: 'Remove', cancelButton: 'Cancel' });
+    if (ok === c.POPUP_RESULT.AFFIRMATIVE) await setPicture(name, '');
+}
+
+async function editLook(name) {
+    const c = ctx();
+    const res = await c.callGenericPopup(`How ${name} looks, for their picture`, c.POPUP_TYPE.INPUT, lookOf(name).look, { rows: 4, wide: true, okButton: 'Save', cancelButton: 'Cancel' });
+    if (typeof res !== 'string') return;
+    const look = res.replace(/\s+/g, ' ').trim();
+    if (look && describesMinor(look)) { toastr.warning('People here are adults: that look describes a minor, so it wasn\'t saved.'); return; }
+    const map = pictureMap(true);
+    const k = personaKey(name);
+    map[k] = { ...(map[k] || {}), name };
+    if (look) map[k].look = look; else delete map[k].look;
+    await saveChatMeta();
+    refreshViews();
+}
+
+const pictureTried = new Set();   // `${chat}|${person}`: drawn on its own once a session, so a failing source isn't hit every reply
+/** With "Draw pictures on their own" on: a picture for each host with a sheet, and each person in the Mind Book. */
+async function ensurePictures() {
+    if (!on() || !settings().pictures.auto || !imageGenOn()) return;
+    const key = chatKey();
+    const people = [];
+    if (ledgerWanted()) for (const b of takenBodies(headLedger()?.ledger)) if (personaMap()[personaKey(b.body)]?.sheet) people.push(b.body);
+    if (mindWanted()) {
+        const book = headMind()?.book;
+        for (const h of book?.hypnosis || []) people.push(h.who);
+        for (const w of book?.control || []) people.push(...w.who);
+    }
+    const skip = cardNames();
+    for (const name of people) {
+        const k = personaKey(name);
+        const id = `${key}|${k}`;
+        if (!k || skip.has(k) || pictureOf(name) || pictureMap()[k]?.keepEmpty || pictureTried.has(id) || viewBusy.has(`pic:${k}`)) continue;
+        pictureTried.add(id);
+        await busyWork(`pic:${k}`, name, 'Drawing…', () => drawPicture(name, key), { quiet: true });
+        if (chatKey() !== key) return;
+    }
+}
+
+// ------------------------------------------------------------------ the views behind the bars
+// Tapping a bar above the chat (or ✏️ on the panel, or Body Ledger in the wand menu) opens the Ledger or the Mind Book as
+// cards that read at a glance (views.js): one per body or person, each body with who its owner is in their own life. A
+// card's ✏️ turns it into its form in place. An open view redraws itself whenever what it shows changes, except while
+// you're changing something in it; then it waits until you save or cancel.
+const liveViews = new Set();   // { kind: 'ledger' | 'mind' | 'picture', render } for each view open
+const viewBusy = new Map();   // 'sheet:<person>' or 'pic:<person>' → what's being done, shown on their card
+const refreshViews = kind => { for (const v of liveViews) if (!kind || v.kind === kind) v.render(); };
+
+let batch = null;   // "Draw missing pictures": { done, total } while it runs
+/** The people a view could draw (a face to tap, no picture yet), while Image Generation is on, and how far a run is. */
+function missingPictures(faces) {
+    const names = imageGenOn() ? [...new Map(faces.filter(([, f]) => f?.open && !f.image).map(([n]) => [personaKey(n), n])).values()] : [];
+    return { missing: names, batch: batch ? `Drawing ${Math.min(batch.done + 1, batch.total)} of ${batch.total}…` : '' };
+}
+/** Draws everyone in a view who can have a picture and has none yet, one after another. */
+async function drawMissing(names) {
+    if (batch) return;
+    const key = chatKey();
+    const todo = names.filter(n => !pictureOf(n) && !viewBusy.has(`pic:${personaKey(n)}`));
+    if (!todo.length) return;
+    batch = { done: 0, total: todo.length };
+    refreshViews();
+    let drawn = 0;
+    try {
+        for (const n of todo) {
+            if (chatKey() !== key) break;
+            await busyWork(`pic:${personaKey(n)}`, n, 'Drawing…', () => drawPicture(n, key), { quiet: true });
+            if (pictureOf(n)) drawn++;
+            batch.done++;
+            refreshViews();
+        }
+    } finally {
+        batch = null;
+        refreshViews();
+    }
+    if (drawn === todo.length) toastr.info(`Drew ${drawn} picture${drawn > 1 ? 's' : ''}.`);
+    else toastr.warning(`Drew ${drawn} of ${todo.length} pictures. ${$('#wh_ledger_status').text()}`);
+}
+
+/** Runs a job on someone's sheet or picture with a note on their card while it runs, then says how it went. */
+async function busyWork(key, name, label, job, { quiet = false } = {}) {
+    if (viewBusy.has(key)) return;
+    viewBusy.set(key, label);
+    refreshViews();
+    if (!quiet) $('#wh_ledger_status').text('');
+    try { await job(); } finally {
+        viewBusy.delete(key);
+        refreshViews();
+    }
+    const said = $('#wh_ledger_status').text();
+    if (!quiet && said.includes(name)) toastr.info(said);
+}
+
+async function showView(kind, make, { wide = true } = {}) {
+    const c = ctx();
+    if (!c.chat?.length) { toastr.info('Open a chat first.'); return; }
+    const box = $('<div class="wh-dos-wrap"></div>');
+    const draw = () => box.empty().append(make(view));
+    const view = { kind, render: () => { if (!box.find('.wh-dos-editing').length) draw(); }, refresh: draw };
+    draw();
+    liveViews.add(view);
+    try { await c.callGenericPopup(box, c.POPUP_TYPE.TEXT, '', { wide, allowVerticalScrolling: true, okButton: 'Close' }); } finally { liveViews.delete(view); }
+}
+
+function ledgerViewData() {
+    const c = ctx();
+    const chat = c.chat || [];
+    const ledger = normalizeLedger(headLedger()?.ledger || EMPTY_LEDGER);
+    const canon = aliasResolver(ledger);
+    const me = canon(c.name1 || '');
+    const map = personaMap();
+    const host = (name, kind) => {
+        const e = map[personaKey(name)];
+        return { sheet: e?.sheet || null, removed: !!e?.removed, busy: viewBusy.get(`sheet:${personaKey(name)}`) || '', face: faceFor(name, kind) };
+    };
+    const taken = new Set(takenBodies(ledger).map(b => personaKey(b.body)));
+    const inLedger = new Set(ledger.bodies.filter(b => b.body).map(b => personaKey(b.body)));
+    // Each body as the bar shows it: teal when it's you inside, violet someone else (a copy is always its own person).
+    const bodies = ledger.bodies.map((b, i) => {
+        const body = b.body && b.body.toLowerCase() !== 'none' ? b.body : null;
+        const copy = /cop(y|ied)|propagat/i.test(b.how) && body && b.driver;
+        const kind = !body ? 'mind' : !b.driver ? 'idle' : copy ? 'npc' : canon(b.driver) === me ? 'you' : 'npc';
+        // A taken body's card holds its owner's sheet; so does an empty one that has a sheet from before.
+        const sheetable = !!body && (taken.has(personaKey(body)) || (!!map[personaKey(body)]?.sheet && !cardNames().has(personaKey(body))));
+        const row = { body: b.body, pronouns: b.pronouns, driver: b.driver, driver_pronouns: b.driver_pronouns, how: b.how, host: b.host, notes: b.notes, doing: b.doing, user_knows: b.user_knows };
+        return {
+            i, row, title: body || b.driver, kind, sheetable,
+            hidden: b.user_knows === 'no' && !!body && !!b.driver,
+            icon: copy ? 'fa-clone' : { you: 'fa-user', npc: 'fa-ghost', idle: 'fa-user-slash', mind: 'fa-wind' }[kind],
+            inside: copy ? `a copy of ${canon(b.driver) === me ? 'you' : b.driver}`
+                : { you: "you're inside", npc: canon(body) === me ? `${b.driver} is in you` : `${b.driver} inside`, idle: 'empty', mind: 'no body' }[kind],
+            ...(body && !cardNames().has(personaKey(body)) ? host(body, kind) : { sheet: null, face: faceFor(body || b.driver, kind) }),
+        };
+    });
+    const back = hostsBack(ledger, chat, chat.length).map(e => ({ body: e.body, ...host(e.body, 'back') }));
+    const shown = new Set([...inLedger, ...back.map(e => personaKey(e.body))]);
+    const past = Object.values(map).filter(e => e.sheet && !shown.has(personaKey(e.body)))
+        .sort((a, b) => a.body.localeCompare(b.body)).map(e => ({ body: e.body, ...host(e.body, 'idle') }));
+    const history = historyGroups(bodyHistory(ledgerSnapshots())).map(g => ({
+        title: `${g.driver} in ${g.bodies.join(', ')} · ${g.ended === 1 ? 'once' : g.ended === 2 ? 'twice' : `${g.ended}×`}${g.ongoing ? ', again now' : ''}`,
+        lines: [g.notes.remembers ? ['Remembers', g.notes.remembers] : g.host ? ['Their mind', g.host] : null,
+            g.notes.kept ? ['Kept', g.notes.kept] : null, g.notes.left ? ['Left behind', g.notes.left] : null].filter(Boolean),
+        hidden: g.user_knows === 'no', ongoing: g.ongoing,
+    }));
+    return {
+        bodies, back, past, history, powers: ledger.powers, aliases: ledger.aliases,
+        ...missingPictures([...bodies.map(b => [b.title, b.face]), ...back.map(h => [h.body, h.face]), ...past.map(h => [h.body, h.face])]),
+        empty: ledgerWanted() ? 'Everyone is in their own body.' : 'The Ledger is off: switch on Body Ledger & Mind Book under Settings → Choices, and pick a body mode.',
+    };
+}
+
+/** Saves the Ledger as changed in the view, on the newest message; the next update builds on it. */
+async function storeLedgerEdit(next) {
+    const c = ctx();
+    storeLedger(c.chat.length - 1, normalizeLedger(next));
+    await c.saveChat();
+    applyLedgerInjection();
+    renderLedgerPanel();
+}
+const changedMeanwhile = what => { toastr.warning(`The ${what} changed while you were editing. Cancel, look it over, and try again.`); return false; };
+
+/** Saves a body's card: a new body (i = -1, with an optional sheet), or one part of one already there (orig). */
+async function saveBody(i, orig, { row, sheet }) {
+    const c = ctx();
+    if (!c.chat?.length) return false;
+    row = Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v ?? '').trim()]));
+    const made = sheet ? sheetFromFields(sheet) : null;
+    if (made?.minor) { toastr.warning('Hosts are adults: that sheet describes a minor, so it wasn\'t saved.'); return false; }
+    const ledger = normalizeLedger(headLedger()?.ledger || EMPTY_LEDGER);
+    const at = orig ? ledger.bodies.findIndex(b => same(b.body, orig.body) && same(b.driver, orig.driver)) : -1;
+    if (orig && at < 0) return changedMeanwhile('Ledger');
+    // Saved as typed: the "once you know, you keep knowing" rule only guards the model's updates, not your edits.
+    const next = { ...(orig ? ledger.bodies[at] : {}), ...row };
+    if (!next.body && !next.driver) { toastr.warning('A body needs a name, or a mind inside it.'); return false; }
+    if (orig) ledger.bodies[at] = next; else ledger.bodies.push(next);
+    if (orig?.body && next.body && !same(orig.body, next.body)) movePerson(orig.body, next.body);
+    if (made?.sheet && next.body && !cardNames().has(personaKey(next.body))) await setSheet(next.body, made.sheet);
+    await storeLedgerEdit(ledger);
+    return true;
+}
+
+async function removeBody(i, orig) {
+    const c = ctx();
+    const name = orig.body || orig.driver;
+    const ok = await c.callGenericPopup(`Take ${name} out of the Ledger?`, c.POPUP_TYPE.CONFIRM, '', { okButton: 'Remove', cancelButton: 'Cancel' });
+    if (ok !== c.POPUP_RESULT.AFFIRMATIVE) return false;
+    const ledger = normalizeLedger(headLedger()?.ledger || EMPTY_LEDGER);
+    const at = ledger.bodies.findIndex(b => same(b.body, orig.body) && same(b.driver, orig.driver));
+    if (at < 0) return changedMeanwhile('Ledger');
+    ledger.bodies.splice(at, 1);
+    await storeLedgerEdit(ledger);
+    return true;
+}
+
+/** Adds (i = -1), changes or removes (v = null) a power or a name; v is what its chip's form holds. */
+async function saveListItem(list, i, v) {
+    const ledger = normalizeLedger(headLedger()?.ledger || EMPTY_LEDGER);
+    let item = null;
+    if (v && list === 'powers') {
+        item = { who: v.who.trim(), power: v.power.trim() };
+        if (!item.who || !item.power) { toastr.warning('Say who has it and what it is.'); return false; }
+    }
+    if (v && list === 'aliases') {
+        item = { name: v.name.trim(), aka: v.aka.split(',').map(x => x.trim()).filter(Boolean) };
+        if (!item.name || !item.aka.length) { toastr.warning('Give the main name and at least one other.'); return false; }
+    }
+    if (i < 0) ledger[list].push(item);
+    else if (item) ledger[list][i] = item;
+    else ledger[list].splice(i, 1);
+    await storeLedgerEdit(ledger);
+    return true;
+}
+
+async function saveSheetFromView(name, values) {
+    const made = sheetFromFields(values);
+    if (made.minor) { toastr.warning('Hosts are adults: that sheet describes a minor, so it wasn\'t saved.'); return false; }
+    await setSheet(name, made.sheet, { taken: isTaken(name) });
+    applyLedgerInjection();
+    renderLedgerPanel();
+    return true;
+}
+
+async function deleteSheet(name) {
+    const c = ctx();
+    const ok = await c.callGenericPopup(`Delete ${name}'s sheet?`, c.POPUP_TYPE.CONFIRM, '', { okButton: 'Delete', cancelButton: 'Cancel' });
+    if (ok !== c.POPUP_RESULT.AFFIRMATIVE) return false;
+    await setSheet(name, null, { taken: isTaken(name) });
+    applyLedgerInjection();
+    renderLedgerPanel();
+    ledgerStatus(`Host persona deleted for ${name}.`);
+    return true;
+}
+
+function mindViewData() {
+    const book = normalizeBook(headMind()?.book || EMPTY_BOOK);
+    const me = String(ctx().name1 || '').toLowerCase();
+    const isMe = n => !!n && n.toLowerCase() === me;
+    const kind = by => (isMe(by) ? 'you' : 'npc');
+    const label = n => (isMe(n) ? 'you' : n);
+    const hypnosis = book.hypnosis.map(h => [h.who, faceFor(h.who, kind(h.by))]);
+    const control = book.control.map(w => [w.who[0], faceFor(w.who[0], kind(w.by))]);
+    return {
+        ...missingPictures([...hypnosis, ...control]),
+        kinds: [...new Set([...mindKinds(), ...MIND_KINDS.filter(k => book[k].length)])],
+        hypnosis: book.hypnosis.map((h, i) => ({
+            i, raw: h, who: h.who, kind: kind(h.by), by: h.by, byLabel: label(h.by), susceptibility: h.susceptibility, times: h.times,
+            amnesia: h.amnesia === 'yes', hidden: h.user_knows === 'no', now: h.now || 'awake', deepest: h.deepest,
+            suggestions: h.suggestions.map(x => ({ text: x.text, stage: x.stage, reinforced: x.times > 1 })), triggers: h.triggers,
+            face: faceFor(h.who, kind(h.by)),
+        })),
+        control: book.control.map((w, i) => ({
+            i, raw: w, who: w.who, kind: kind(w.by), by: w.by, byLabel: label(w.by), resists: w.resists === 'yes', hidden: w.user_knows === 'no', set: w.set, own: w.own,
+            face: faceFor(w.who[0], kind(w.by)),
+        })),
+        perception: book.perception.map((e, i) => {
+            const who = e.everyone ? `Everyone${e.except.length ? ` but ${e.except.join(', ')}` : ''}` : e.who.join(', ');
+            return {
+                i, raw: e, kind: kind(e.by), by: e.by, byLabel: label(e.by), hidden: e.user_knows === 'no', what: e.what,
+                icon: e.kind === 'unseen' ? 'fa-eye-slash' : e.kind === 'false' ? 'fa-masks-theater' : 'fa-wand-magic-sparkles',
+                title: e.kind === 'unseen' ? `${who} can't perceive ${label(e.target)}` : e.kind === 'false' ? `${who}: a false belief` : `${who}: an altered normal`,
+            };
+        }),
+        empty: 'Pick Hypnosis, Mind Control or Altered Perception for this character to start a Mind Book.',
+    };
+}
+
+/** A Mind Book entry with one part of its card saved over it (lines of suggestions, triggers and settings read back into lists). */
+function mindEntryFromForm(kind, o, raw) {
+    const lines = s => String(s || '').split('\n').map(x => x.trim()).filter(Boolean);
+    const out = { ...(raw || {}), ...o };
+    if ('suggestions' in o) out.suggestions = lines(o.suggestions).map(l => { const [text, stage, n] = l.split('|').map(x => x.trim()); return { text, stage, times: parseInt(n, 10) || 1 }; });
+    if ('triggers' in o) out.triggers = lines(o.triggers).map(l => { const [cue, ...rest] = l.split(/\s*(?:→|->)\s*/); return { cue, effect: rest.join(' → ') }; });
+    if ('set' in o) out.set = lines(o.set).map(l => { const m = l.match(/^\s*(wants|feels|believes|loyal to|command)\s*:\s*(.+)$/i); return m ? { kind: m[1].toLowerCase(), text: m[2] } : { kind: 'wants', text: l }; });
+    if ('everyone' in o) out.everyone = o.everyone === 'yes';
+    return out;
+}
+
+async function storeMindEdit(next) {
+    const c = ctx();
+    storeMind(c.chat.length - 1, next);
+    await c.saveChat();
+    applyLedgerInjection();
+    renderMindPanel();
+}
+const findEntry = (list, raw) => list.findIndex(x => (raw.id ? x.id === raw.id : JSON.stringify(x) === JSON.stringify(raw)));
+
+async function saveMindEntry(kind, i, raw, values) {
+    const book = normalizeBook(headMind()?.book || EMPTY_BOOK);
+    const list = [...book[kind]];
+    const entry = mindEntryFromForm(kind, values, raw);
+    const need = kind === 'perception' ? entry.what : entry.who;
+    if (!String(Array.isArray(need) ? need.join('') : need || '').trim()) { toastr.warning(kind === 'perception' ? 'Say what the edit is.' : 'Say who it is.'); return false; }
+    if (raw) {
+        const at = findEntry(list, raw);
+        if (at < 0) return changedMeanwhile('Mind Book');
+        list[at] = entry;
+    } else list.push(entry);
+    await storeMindEdit({ ...book, [kind]: list });
+    return true;
+}
+
+async function removeMindEntry(kind, i, raw) {
+    const c = ctx();
+    const ok = await c.callGenericPopup('Take this out of the Mind Book?', c.POPUP_TYPE.CONFIRM, '', { okButton: 'Remove', cancelButton: 'Cancel' });
+    if (ok !== c.POPUP_RESULT.AFFIRMATIVE) return false;
+    const book = normalizeBook(headMind()?.book || EMPTY_BOOK);
+    const at = findEntry(book[kind], raw);
+    if (at < 0) return changedMeanwhile('Mind Book');
+    await storeMindEdit({ ...book, [kind]: book[kind].filter((_, j) => j !== at) });
+    return true;
+}
+
+function openLedgerView() {
+    return showView('ledger', view => ledgerView(ledgerViewData(), {
+        saveBody, removeBody,
+        saveSheet: saveSheetFromView, deleteSheet,
+        writeSheet: name => busyWork(`sheet:${personaKey(name)}`, name, 'Writing the sheet…', () => rewritePersona(name)),
+        makePersona,
+        savePower: (i, v) => saveListItem('powers', i, v),
+        saveAlias: (i, v) => saveListItem('aliases', i, v),
+        drawMissing,
+        refresh: view.refresh,
+    }));
+}
+function openMindView() {
+    return showView('mind', view => mindView(mindViewData(), { save: saveMindEntry, remove: removeMindEntry, drawMissing, refresh: view.refresh }));
+}
+function openPicture(name, kind = 'idle') {
+    const k = personaKey(name);
+    return showView('picture', () => {
+        const { look, fromSheet } = lookOf(name);
+        return pictureView({ name, image: pictureOf(name), look, lookFromSheet: fromSheet, busy: viewBusy.get(`pic:${k}`) || '', kind }, {
+            draw: () => busyWork(`pic:${k}`, name, 'Drawing…', () => drawPicture(name)),
+            upload: () => uploadPicture(name),
+            remove: () => removePicture(name),
+            editLook: () => editLook(name),
+        });
+    }, { wide: false });
 }
 
 function ledgerStatus(text) {
@@ -662,18 +1401,21 @@ function renderLedgerPanel() {
     $('#wh_ledger_enabled').prop('checked', settings().ledger.enabled);
     renderStrip();
     renderBadges();
+    refreshViews('ledger');
 }
 
-// A one-line strip above the chat: who is in which body, at a glance. Tap to edit.
+// A one-line strip above the chat: who is in which body, at a glance. Tap it for the full view.
 let ledgerBusy = false;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/** A bar chip's lead: the person's face, small, when there is one; else the chip's icon. */
+const chipLead = (icon, face) => (face ? `<img class="wh-chip-face" src="${esc(face)}" alt="" loading="lazy">` : `<i class="fa-solid ${icon} wh-chip-icon"></i>`);
 
 // The bars above the chat: the Ledger's, then the Mind Book's under it. Made together, so they always stack the same way.
 function ensureStrips() {
     if ($('#wh_ledger_strip').length) return;
     const bar = (id, cls, title, open) => $(`<div id="${id}" class="wh-ledger-strip ${cls}" title="${title}" role="button" tabindex="0"></div>`)
         .on('click keydown', e => { if (e.type === 'click' || e.key === 'Enter') open(); }).hide();
-    $('#chat').before(bar('wh_ledger_strip', '', 'Body Ledger — tap to edit', openLedgerEditor), bar('wh_mind_strip', 'wh-mind-strip', 'Mind Book — tap to edit', openMindEditor));
+    $('#chat').before(bar('wh_ledger_strip', '', 'Body Ledger — tap to open', openLedgerView), bar('wh_mind_strip', 'wh-mind-strip', 'Mind Book — tap to open', openMindView));
 }
 
 function renderStrip() {
@@ -684,7 +1426,7 @@ function renderStrip() {
     if (!ledgerWanted() || !ctx().chat?.length || (!bodies.length && !ledgerBusy)) { $('#wh_ledger_strip').hide(); renderLanes(); return; }
     const canon = aliasResolver(ledger);
     const me = canon(ctx().name1 || '');
-    const chip = (kind, icon, title, sub, tip, hidden) => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}" title="${esc(tip)}"><i class="fa-solid ${icon} wh-chip-icon"></i>`
+    const chip = (kind, icon, title, sub, tip, hidden, face = '') => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}${face ? ' wh-has-face' : ''}" title="${esc(tip)}">${chipLead(icon, face)}`
         + `<span class="wh-chip-text"><b>${esc(title)}</b><small>${esc(sub)}${hidden ? ' · hidden <i class="fa-solid fa-eye-slash"></i>' : ''}</small></span></span>`;
     // Two lines per body; the color says who is doing it: teal when it's you, violet when it's someone else.
     // A copy is its own person even when it's a copy of you, so it's always violet.
@@ -698,7 +1440,7 @@ function renderStrip() {
         const icon = copy ? 'fa-clone' : { you: 'fa-user', npc: 'fa-ghost', empty: 'fa-user-slash', mind: 'fa-wind' }[kind];
         const aka = body ? akaOf(ledger, body) : [];
         const tip = [b.how, b.host ? `own mind: ${b.host}` : '', aka.length ? `also ${aka.join(', ')}` : '', b.user_knows === 'no' ? 'hidden from you' : ''].filter(Boolean).join(' · ');
-        return chip(kind, icon, title, sub, tip, b.user_knows === 'no');
+        return chip(kind, icon, title, sub, tip, b.user_knows === 'no', faceFor(title).image);
     });
     $('#wh_ledger_strip').html(`${chips.join('')}${ledgerBusy ? '<span class="wh-busy">updating…</span>' : ''}`).show();
     renderLanes();
@@ -837,79 +1579,6 @@ function setLedgerBusy(v) {
 }
 
 // Each body is one collapsed line ("Body ← Mind · how"); tap it to edit its fields.
-const field = (k, label, ph, value, cls = '') => $(`<label class="wh-f ${cls}"></label>`)
-    .append($('<small></small>').text(label), $('<input class="text_pole">').attr({ 'data-k': k, placeholder: ph }).val(value || ''));
-const delButton = onDelete => $('<div class="menu_button fa-solid fa-trash wh-row-del" title="Remove"></div>')
-    .on('click', e => { e.preventDefault(); e.stopPropagation(); onDelete(); });
-
-async function openLedgerEditor() {
-    const c = ctx();
-    if (!c.chat?.length) { toastr.info('Open a chat first.'); return; }
-    const head = headLedger();
-    const ledger = normalizeLedger(head?.ledger || EMPTY_LEDGER);
-    const root = $('<div class="wh-ledger-editor"></div>');
-    root.append('<h3>Body Ledger</h3><small class="wh-muted">Who is in which body right now. Tap a row to edit it; the next update builds on what you save.</small>');
-
-    const bodies = $('<div class="wh-ledger-rows"></div>');
-    const bodyRow = (b = {}, open = false) => {
-        const card = $('<details class="wh-body-card"></details>').prop('open', open);
-        const title = $('<span class="wh-body-title"></span>');
-        const sum = $('<summary></summary>').append(title, delButton(() => card.remove()));
-        const fields = $('<div class="wh-fields"></div>').append(
-            field('body', 'Body', 'whose body', b.body), field('pronouns', 'Pronouns', 'she/her', b.pronouns),
-            field('driver', 'Mind inside', 'who is in it (blank if nobody)', b.driver), field('driver_pronouns', 'Pronouns', 'he/him', b.driver_pronouns),
-            field('how', 'How', 'possession, swap, skinsuit…', b.how), field('host', "Owner's mind", 'gone, asleep, watching…', b.host),
-            field('notes', 'Notes', 'anything worth remembering', b.notes, 'wh-full'),
-            field('doing', 'Busy with', 'what it is doing right now', b.doing, 'wh-full'),
-            $('<label class="checkbox_label wh-full"></label>').append($('<input type="checkbox" data-k="user_knows">').prop('checked', b.user_knows !== 'no'), $('<span>You know about this</span>')),
-        );
-        const refresh = () => {
-            const v = k => String(card.find(`[data-k="${k}"]`).val() || '').trim();
-            const body = v('body') || 'New body', driver = v('driver');
-            title.text(driver ? `${body} ← ${driver}` : `${body}: empty`).append(v('how') ? $('<small></small>').text(` · ${v('how')}`) : '');
-            if (!card.find('[data-k="user_knows"]').prop('checked')) title.append(' <i class="fa-solid fa-eye-slash" title="hidden from you"></i>');
-        };
-        card.append(sum, fields).on('input change', refresh);
-        refresh();
-        return card;
-    };
-    ledger.bodies.forEach(b => bodies.append(bodyRow(b)));
-    root.append(bodies, $('<div class="menu_button">+ Body</div>').on('click', () => bodies.append(bodyRow({}, true))));
-
-    const pairRow = (a, b, extra = '') => {
-        const row = $(`<div class="wh-pair ${extra}"></div>`);
-        return row.append(a, b, delButton(() => row.remove()));
-    };
-    root.append('<div class="wh-mini-title" title="Who can do what: the Ledger keeps these in mind even when nobody is using them.">Powers</div>');
-    const powers = $('<div class="wh-ledger-rows"></div>');
-    const powerRow = (p = {}) => pairRow(field('who', 'Who', 'who has it', p.who), field('power', 'Power', 'e.g. body swap by touch', p.power), 'wh-power-row');
-    ledger.powers.forEach(p => powers.append(powerRow(p)));
-    root.append(powers, $('<div class="menu_button">+ Power</div>').on('click', () => powers.append(powerRow())));
-
-    root.append('<div class="wh-mini-title" title="One person, several names: a code name, a handle, a host number.">Also known as</div>');
-    const aliases = $('<div class="wh-ledger-rows"></div>');
-    const aliasRow = (a = {}) => pairRow(field('name', 'Name', 'main name', a.name), field('aka', 'Also called', 'other names, comma-separated', (a.aka || []).join(', ')), 'wh-power-row');
-    ledger.aliases.forEach(a => aliases.append(aliasRow(a)));
-    root.append(aliases, $('<div class="menu_button">+ Name</div>').on('click', () => aliases.append(aliasRow())));
-
-    const res = await c.callGenericPopup(root, c.POPUP_TYPE.CONFIRM, '', { wide: true, large: true, okButton: 'Save', cancelButton: 'Cancel' });
-    if (res !== c.POPUP_RESULT.AFFIRMATIVE) return;
-    const read = (container, sel) => container.find(sel).map((_, row) => {
-        const o = {};
-        $(row).find('input[data-k]').each((__, inp) => {
-            o[$(inp).data('k')] = inp.type === 'checkbox' ? (inp.checked ? 'yes' : 'no') : String($(inp).val() || '');
-        });
-        return o;
-    }).get();
-    // Saved as typed: the "once you know, you keep knowing" rule only guards the model's updates, not your edits.
-    const next = normalizeLedger({ bodies: read(bodies, '.wh-body-card'), own: ledger.own, powers: read(powers, '.wh-pair'), aliases: read(aliases, '.wh-pair') });
-    storeLedger(c.chat.length - 1, next);
-    await c.saveChat();
-    applyLedgerInjection();
-    renderLedgerPanel();
-    toastr.success('Body Ledger saved.');
-}
-
 // ------------------------------------------------------------------ Mind Book
 
 // The Mind Book follows the Ledger's pattern: a snapshot on the reply that changed it (and in swipe_info), so swipes
@@ -1036,17 +1705,17 @@ function renderMindStrip() {
     if (!mindWanted() || !ctx().chat?.length || (isEmptyBook(book) && !mindBusy)) { $('#wh_mind_strip').hide(); return; }
     const me = String(ctx().name1 || '').toLowerCase();
     const mine = by => (by && by.toLowerCase() === me ? 'you' : 'npc');
-    const chip = (kind, icon, title, sub, tip, hidden) => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}" title="${esc(tip)}"><i class="fa-solid ${icon} wh-chip-icon"></i>`
+    const chip = (kind, icon, title, sub, tip, hidden, face = '') => `<span class="wh-chip wh-${kind}${hidden ? ' wh-hidden' : ''}${face ? ' wh-has-face' : ''}" title="${esc(tip)}">${chipLead(icon, face)}`
         + `<span class="wh-chip-text"><b>${esc(title)}</b><small>${esc(sub)}${hidden ? ' · hidden <i class="fa-solid fa-eye-slash"></i>' : ''}</small></span></span>`;
     const you = n => (n && n.toLowerCase() === me ? 'you' : n);
     const chips = [
         ...(book?.hypnosis || []).map(h => chip(mine(h.by), 'fa-circle-dot', h.who,
             h.now === 'awake' ? (h.times ? `awake · under ${h.times}×` : 'awake') : `${h.now} trance`,
             ['hypnosis', h.by ? `by ${you(h.by)}` : '', h.suggestions.length ? `${h.suggestions.length} suggestion${h.suggestions.length > 1 ? 's' : ''}` : '', h.triggers.length ? `triggers: ${h.triggers.map(t => `"${t.cue}"`).join(', ')}` : ''].filter(Boolean).join(' · '),
-            h.user_knows === 'no')),
+            h.user_knows === 'no', faceFor(h.who).image)),
         ...(book?.control || []).map(w => chip(mine(w.by), 'fa-hand-sparkles', w.who.join(', '),
             `${w.by ? (mine(w.by) === 'you' ? 'your control' : `${w.by}'s control`) : 'controlled'}${w.resists === 'yes' ? ' · resisting' : ''}`,
-            ['mind control', ...w.set.map(x => `${x.kind} ${x.text}`)].join(' · '), w.user_knows === 'no')),
+            ['mind control', ...w.set.map(x => `${x.kind} ${x.text}`)].join(' · '), w.user_knows === 'no', faceFor(w.who[0]).image)),
         ...(book?.perception || []).map(e => chip(mine(e.by), 'fa-eye-slash',
             e.everyone ? `Everyone${e.except.length ? ` but ${e.except.join(', ')}` : ''}` : e.who.join(', '),
             e.kind === 'unseen' ? `can't perceive ${you(e.target)}` : e.kind === 'false' ? 'believes a falsehood' : 'altered normal',
@@ -1057,6 +1726,7 @@ function renderMindStrip() {
 
 function renderMindPanel() {
     renderMindStrip();
+    refreshViews('mind');
     const kinds = mindKinds();
     const head = headMind();
     const book = head?.book;
@@ -1086,85 +1756,6 @@ function renderMindPanel() {
             ? 'Nothing yet. It fills in when someone is hypnotized, controlled, or has their perception changed. Tap ✏️ to add something yourself.'
             : 'The Mind Book is off with the Body Ledger (Settings → Choices).'));
     }
-}
-
-const textArea = (k, label, ph, value, cls = 'wh-full') => $(`<label class="wh-f ${cls}"></label>`)
-    .append($('<small></small>').text(label), $('<textarea class="text_pole" rows="2"></textarea>').attr({ 'data-k': k, placeholder: ph }).val(value || ''));
-const pick = (k, label, options, value) => $('<label class="wh-f"></label>')
-    .append($('<small></small>').text(label), $('<select class="text_pole"></select>').attr('data-k', k).append(options.map(o => $('<option></option>').val(o).text(o || '—'))).val(value || ''));
-const tick = (k, label, checked) => $('<label class="checkbox_label wh-full"></label>').append($(`<input type="checkbox" data-k="${k}">`).prop('checked', !!checked), $('<span></span>').text(label));
-
-async function openMindEditor() {
-    const c = ctx();
-    if (!c.chat?.length) { toastr.info('Open a chat first.'); return; }
-    const book = normalizeBook(headMind()?.book || EMPTY_BOOK);
-    const kinds = [...new Set([...mindKinds(), ...MIND_KINDS.filter(k => book[k].length)])];
-    if (!kinds.length) { toastr.info('Pick Hypnosis, Mind Control or Altered Perception for this character first.'); return; }
-    const root = $('<div class="wh-ledger-editor wh-mind-editor"></div>');
-    root.append('<h3>Mind Book</h3><small class="wh-muted">What mind-changing powers have put into people. Tap an entry to edit it; the next update builds on what you save.</small>');
-    const card = (title, fields, open) => {
-        const d = $('<details class="wh-body-card"></details>').prop('open', open);
-        const t = $('<span class="wh-body-title"></span>').text(title);
-        d.append($('<summary></summary>').append(t, delButton(() => d.remove())), $('<div class="wh-fields"></div>').append(fields));
-        return d;
-    };
-    const lists = {};
-    const section = (kind, title, make, blank) => {
-        root.append($('<div class="wh-mini-title"></div>').text(title));
-        const rows = $('<div class="wh-ledger-rows"></div>').attr('data-kind', kind);
-        book[kind].forEach(x => rows.append(make(x, false)));
-        root.append(rows, $('<div class="menu_button"></div>').text(`+ ${blank}`).on('click', () => rows.append(make({}, true))));
-        lists[kind] = rows;
-    };
-    if (kinds.includes('hypnosis')) section('hypnosis', 'Hypnosis', (h, open) => card(h.who || 'New subject', [
-        field('who', 'Who', 'who is hypnotized', h.who), field('by', 'By', 'who hypnotizes them', h.by),
-        pick('susceptibility', 'Susceptibility', ['', 'low', 'average', 'high'], h.susceptibility), pick('now', 'Right now', MIND_STAGES, h.now || 'awake'),
-        field('times', 'Times under', '0', String(h.times ?? '')), pick('deepest', 'Deepest so far', ['', ...MIND_STAGES.slice(1)], h.deepest),
-        textArea('suggestions', 'Suggestions, one per line: what it is | stage', 'finds Ash\'s voice calming | deep', (h.suggestions || []).map(x => `${x.text}${x.stage ? ` | ${x.stage}` : ''}${x.times > 1 ? ` | ${x.times}×` : ''}`).join('\n')),
-        textArea('triggers', 'Triggers, one per line: cue → effect', 'bloom → drops into a trance', (h.triggers || []).map(x => `${x.cue} → ${x.effect}`).join('\n')),
-        tick('amnesia', 'Told to forget the sessions', h.amnesia === 'yes'), tick('user_knows', 'You know about this', h.user_knows !== 'no'),
-    ], open), 'Subject');
-    if (kinds.includes('control')) section('control', 'Mind control', (w, open) => card(w.who?.length ? `${w.who.join(', ')}${w.by ? ` ← ${w.by}` : ''}` : 'New will', [
-        field('who', 'Who', 'one name, or several separated by commas', (w.who || []).join(', ')), field('by', 'Controller', 'who holds the control', w.by),
-        textArea('set', 'What was set, one per line: wants / feels / believes / loyal to / command: …', 'wants: to please Ash above everything', (w.set || []).map(x => `${x.kind}: ${x.text}`).join('\n')),
-        field('own', 'Still their own', 'what the control left alone, or "nothing: a blank drone"', w.own, 'wh-full'),
-        tick('resists', 'Aware of it and pushing against it', w.resists === 'yes'),
-        tick('user_knows', 'You know about this', w.user_knows !== 'no'),
-    ], open).attr('data-id', w.id || ''), 'Will');
-    if (kinds.includes('perception')) section('perception', 'Altered perception', (e, open) => card(e.what || 'New edit', [
-        field('what', 'The edit', 'one plain sentence', e.what, 'wh-full'),
-        pick('kind', 'Kind', ['unseen', 'normal', 'false'], e.kind || 'unseen'), field('target', "Can't perceive (unseen only)", 'who or what', e.target),
-        field('who', 'Who has it', 'names, separated by commas', (e.who || []).join(', ')), field('except', 'Except (with everyone)', 'names', (e.except || []).join(', ')),
-        tick('everyone', 'Everyone has it', e.everyone), field('by', 'Made by', 'who edited them', e.by),
-        tick('user_knows', 'You know about this', e.user_knows !== 'no'),
-    ], open).attr('data-id', e.id || ''), 'Edit');
-
-    const res = await c.callGenericPopup(root, c.POPUP_TYPE.CONFIRM, '', { wide: true, large: true, okButton: 'Save', cancelButton: 'Cancel' });
-    if (res !== c.POPUP_RESULT.AFFIRMATIVE) return;
-    const read = el => {
-        const o = { id: $(el).attr('data-id') || '' };
-        $(el).find('[data-k]').each((_, inp) => { o[$(inp).data('k')] = inp.type === 'checkbox' ? (inp.checked ? 'yes' : 'no') : String($(inp).val() || ''); });
-        return o;
-    };
-    const lines = s => String(s || '').split('\n').map(x => x.trim()).filter(Boolean);
-    const next = { ...book };
-    for (const kind of Object.keys(lists)) {
-        next[kind] = lists[kind].children('.wh-body-card').map((_, el) => {
-            const o = read(el);
-            if (kind === 'hypnosis') {
-                o.suggestions = lines(o.suggestions).map(l => { const [text, stage, n] = l.split('|').map(x => x.trim()); return { text, stage, times: parseInt(n, 10) || 1 }; });
-                o.triggers = lines(o.triggers).map(l => { const [cue, ...rest] = l.split(/\s*(?:→|->)\s*/); return { cue, effect: rest.join(' → ') }; });
-            }
-            if (kind === 'control') o.set = lines(o.set).map(l => { const m = l.match(/^\s*(wants|feels|believes|loyal to|command)\s*:\s*(.+)$/i); return m ? { kind: m[1].toLowerCase(), text: m[2] } : { kind: 'wants', text: l }; });
-            if (kind === 'perception') o.everyone = o.everyone === 'yes';
-            return o;
-        }).get();
-    }
-    storeMind(c.chat.length - 1, next);
-    await c.saveChat();
-    applyLedgerInjection();
-    renderMindPanel();
-    toastr.success('Mind Book saved.');
 }
 
 // ------------------------------------------------------------------ body checks
@@ -1207,6 +1798,10 @@ function recordEdit(msg, before, after, applied) {
 async function runBodyChecks(mesId) {
     const head = headLedger(mesId + 1);
     if (!head || !hasCrossedBodies(head.ledger)) return null;
+    // A known swap names people by who they are on purpose, so a chat whose only borrowed bodies are a known swap has
+    // nothing for either check (no pronoun to move, no pointer to cut).
+    const pronouns = needsPronounCheck(head.ledger);
+    if (!pronouns && !head.ledger.bodies.some(b => b.user_knows === 'no' && b.body && b.driver)) return null;
     const msg = ctx().chat?.[mesId];
     if (!msg || msg.is_user || msg.is_system || !msg.mes || !looksLikeRoleplay(msg.mes)) return null;
     // The WH Editor works on the same reply: let it finish first, so the two never edit it at once.
@@ -1218,7 +1813,7 @@ async function runBodyChecks(mesId) {
     if (!original) return null;
     let text = original;
     const applied = [];
-    try {
+    if (pronouns) try {
         const out = applyPronounFixes(text, parsePronounResponse(await askLedger(buildPronounMessages(text, head.ledger), 500, 0.1)), head.ledger);
         text = out.text;
         applied.push(...out.applied.map(a => ({ action: 'PRONOUN', ...a })));
@@ -1327,6 +1922,56 @@ function onMessageReceived(mesId, type) {
             const notes = noteEndedRides(mesId, ended).catch(err => console.warn(LOG, err));
             if (notesProfile() === ledgerProfile()) await notes;
         }
+        // A body taken for the first time gets its host persona the same way. Pictures that draw on their own come
+        // after the sheets (a host's is drawn from theirs) and never hold anything up: drawing takes a while.
+        const sheets = ledgerWanted() ? ensurePersonas().catch(err => console.warn(LOG, err)) : Promise.resolve();
+        sheets.then(ensurePictures).catch(err => console.warn(LOG, err));
+        if (ledgerWanted() && notesProfile() === ledgerProfile()) await sheets;
+    });
+}
+
+// Editing the newest reply (writing a possession in or out of it, say) has the Ledger and the Mind Book read it again, so
+// what they hold matches the page. Older replies aren't re-read: every snapshot after them was built on the old text.
+let editTimer = null;
+function onMessageEdited(id) {
+    const mesId = Number(id);
+    if (!on() || mesId !== lastReplyIndex()) return;
+    clearTimeout(editTimer);
+    editTimer = setTimeout(() => rereadReply(mesId), 500);
+}
+function rereadReply(mesId) {
+    const key = chatKey();
+    const current = () => chatKey() === key && mesId === lastReplyIndex() && !!ctx().chat?.[mesId];
+    if (!current() || !ledgerProfile() || (!ledgerWanted() && !mindWanted())) return;
+    let done;
+    ledgerReady = new Promise(r => (done = r));
+    enqueue(async () => {
+        let ended = null;
+        try {
+            if (!current()) return;
+            if (ledgerWanted()) {
+                setLedgerBusy(true);
+                const r = await updateLedger(mesId);
+                if (r.ok) ended = r.ended;
+            }
+            if (mindWanted() && current()) await updateMind(mesId);
+        } finally {
+            setLedgerBusy(false);
+            done();
+        }
+        // The history notes follow the re-read: new ones for what the edited reply ends, none if it ends nothing now.
+        if (ended && current()) {
+            const msg = ctx().chat[mesId];
+            if (ended.length) await noteEndedRides(mesId, ended);
+            else if (msg.extra?.wh_history) {
+                delete msg.extra.wh_history;
+                delete msg.swipe_info?.[msg.swipe_id]?.extra?.wh_history;
+                await ctx().saveChat();
+                renderLedgerPanel();
+            }
+        }
+        if (ledgerWanted()) await ensurePersonas().catch(err => console.warn(LOG, err));
+        ensurePictures().catch(err => console.warn(LOG, err));
     });
 }
 
@@ -1378,7 +2023,30 @@ function renderModelSelects() {
     const s = settings();
     fillProfileSelect('#wh_ledger_profile', s.ledger.profile, '— pick a profile —');
     fillProfileSelect('#wh_ledger_notes_profile', s.ledger.notesProfile, 'Same as Ledger');
+    renderPictureSelects();
     $('#wh_no_profiles').toggle(!(ctx().extensionSettings.connectionManager?.profiles || []).length);
+}
+
+/** Settings → Pictures: what Image Generation is set to, and its own styles, models and workflows to pick from. */
+function renderPictureSelects() {
+    const p = settings().pictures;
+    const sd = ctx().extensionSettings.sd;
+    const source = $('#sd_source option:selected').text().trim() || sd?.source || '';
+    $('#wh_pictures_source').text(imageGenOn()
+        ? `Drawn by Image Generation as you've set it up (${source}). Anything left on "As set" follows it.`
+        : 'Image Generation is off: turn it on under Extensions → Image Generation and pick a source.');
+    const fill = (id, options, value) => {
+        const list = [...options];
+        if (value && !list.some(o => o.value === value)) list.push({ value, label: `${value} (not offered now)` });
+        $(id).empty().append($('<option></option>').val('').text('As set in Image Generation'), list.map(o => $('<option></option>').val(o.value).text(o.label))).val(value || '');
+    };
+    fill('#wh_pictures_style', (sd?.styles || []).map(x => ({ value: x.name, label: x.name })), p.style);
+    fill('#wh_pictures_model', sdOptions('sd_model'), p.model);
+    fill('#wh_pictures_workflow', sdOptions('sd_comfy_workflow'), p.workflow);
+    // A workflow only means something to a source that has them.
+    $('#wh_pictures_workflow_row').toggle(sdOptions('sd_comfy_workflow').length > 0);
+    $('#wh_pictures_shape').val(p.shape || '');
+    $('#wh_pictures_rewrite').val(p.rewrite ? 'yes' : '');
 }
 
 function renderWorldSelect() {
@@ -1418,7 +2086,6 @@ async function addSettingsPanel() {
     // The heading's switch: a click on it mustn't also open or close the drawer it sits in.
     $('.wh-power').on('click', e => e.stopPropagation());
     bind('#wh_enabled', () => s.enabled, v => { settings().enabled = v; applyPower(); });
-    bind('#wh_codex_initiative', () => s.codex.initiative, v => { settings().codex.initiative = v; });
     $('#wh_codex_modes').on('change', 'input[type="checkbox"]', onModeToggle);
     $('#wh_codex_suggest_now').on('click', () => enqueue(() => suggestModes({ force: true })));
     $('#wh_codex_edit').on('click', () => { pickerOpen = !$('#wh_codex_modes').is(':visible'); renderCodexPanel(); });
@@ -1426,14 +2093,19 @@ async function addSettingsPanel() {
     $('#wh_codex_preset_on').on('click', switchOnPresetHelpers);
 
     bind('#wh_ledger_enabled', () => s.ledger.enabled, v => { settings().ledger.enabled = v; applyLedgerInjection(); renderLedgerPanel(); });
+    bind('#wh_pictures_auto', () => s.pictures.auto, v => { settings().pictures.auto = v; if (v) ensurePictures().catch(err => console.warn(LOG, err)); });
+    for (const k of ['style', 'model', 'workflow', 'shape']) $(`#wh_pictures_${k}`).on('change', function () { settings().pictures[k] = String($(this).val() || ''); save(); });
+    $('#wh_pictures_rewrite').on('change', function () { settings().pictures.rewrite = $(this).val() === 'yes'; save(); });
+    // Image Generation's lists can change while the panel is open (another source, a new style): read them again on the way in.
+    $('#wh_pictures_box').on('mouseenter focusin', () => { if (!$('#wh_pictures_box select:focus').length) renderPictureSelects(); });
     $('#wh_ledger_backfill').on('click', backfillHistory);
     $('#wh_ledger_notes_profile').on('change', function () { settings().ledger.notesProfile = String($(this).val() || ''); save(); });
     $('#wh_ledger_profile').on('change', function () { settings().ledger.profile = String($(this).val() || ''); save(); });
     $('#wh_codex_world').on('change', function () { settings().codex.world = String($(this).val() || ''); save(); renderWorldSelect(); renderCodexPanel(); syncCodexBook(); })
         .on('focus mousedown', () => { if ($('#wh_codex_world option').length !== (world_names?.length || 0)) renderWorldSelect(); });
     $('#wh_codex_update_now').on('click', () => syncCodexBook({ force: true }).catch(err => toastr.error(err.message)));
-    $('#wh_ledger_open').on('click', openLedgerEditor);
-    $('#wh_mind_open').on('click', openMindEditor);
+    $('#wh_ledger_open').on('click', openLedgerView);
+    $('#wh_mind_open').on('click', openMindView);
     $('#wh_ledger_rebuild').on('click', () => {
         const i = (ctx().chat?.length || 0) - 1;
         if (i < 0) return;
@@ -1485,7 +2157,7 @@ function noteEditorMoved() {
 
 function addWandButton() {
     const item = $('<div id="wh_ledger_wand" class="list-group-item flex-container flexGap5 interactable" tabindex="0" title="Who is in which body"><div class="fa-solid fa-people-arrows extensionsMenuExtensionButton"></div><span>Body Ledger</span></div>');
-    item.on('click', openLedgerEditor);
+    item.on('click', openLedgerView);
     $('#extensionsMenu').append(item);
     const make = $('<div class="list-group-item flex-container flexGap5 interactable" tabindex="0" title="From a card-builder chat: turn the finished pieces into a real character, modes and all"><div class="fa-solid fa-id-card extensionsMenuExtensionButton"></div><span>Make card</span></div>');
     const check = $('<div class="list-group-item flex-container flexGap5 interactable" tabindex="0" title="Check the open character\'s card for things that trip models up"><div class="fa-solid fa-stethoscope extensionsMenuExtensionButton"></div><span>Check card</span></div>');
@@ -1723,7 +2395,7 @@ function addSlashCommands() {
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'wh-mind',
         callback: async (_args, value) => {
-            if (String(value ?? '').trim().toLowerCase() === 'edit') { await openMindEditor(); return ''; }
+            if (String(value ?? '').trim().toLowerCase() === 'edit') { await openMindView(); return ''; }
             const head = headMind();
             return head ? renderMindBook(head.book, ctx().name1 || 'User', { kinds: MIND_KINDS }) || 'empty' : 'no Mind Book yet';
         },
@@ -1735,7 +2407,7 @@ function addSlashCommands() {
         callback: async (_args, value) => {
             const v = String(value ?? '').trim().toLowerCase();
             if (v === 'rebuild') { const i = (ctx().chat?.length || 0) - 1; if (i >= 0) await enqueue(() => updateLedger(i, { rebuild: true })); }
-            else if (v === 'edit') { await openLedgerEditor(); }
+            else if (v === 'edit') { await openLedgerView(); }
             else if (v === 'history') { return historyText() || 'no past body changes yet'; }
             else if (v === 'backfill') { await backfillHistory(); return historyText() || 'no past body changes found'; }
             const head = headLedger();
@@ -1759,6 +2431,7 @@ jQuery(async () => {
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
         if (event_types.MESSAGE_SENT) eventSource.on(event_types.MESSAGE_SENT, () => applyLedgerInjection());
         eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
+        if (event_types.MESSAGE_EDITED) eventSource.on(event_types.MESSAGE_EDITED, onMessageEdited);
         // The preset nudge follows the active preset and its toggles (ticking a block saves the settings).
         for (const ev of [event_types.OAI_PRESET_CHANGED_AFTER, event_types.SETTINGS_UPDATED, event_types.MAIN_API_CHANGED]) {
             if (ev) eventSource.on(ev, () => setTimeout(renderPresetNudge, 0));
