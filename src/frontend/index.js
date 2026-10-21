@@ -759,7 +759,9 @@ export function setup(context) {
         iconSvg: ICON_SVG('hurricane'),
     });
     $(tab.root).addClass('wh-ui');
-    try { dock = ctx.ui.mount('chat_top_dock'); } catch { dock = null; }
+    // The bars go in the full-width slot at the top of the chat column. (Lumiverse's top dock holds its own toolbar
+    // buttons, which the bars would push aside.)
+    try { dock = ctx.ui.mount('chat_column_top'); } catch { dock = null; }
     try { composer = ctx.ui.mount('chat_composer_above'); } catch { composer = null; }
     setupCharacterTab();
 
