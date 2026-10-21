@@ -1,5 +1,6 @@
 // Build the Codex lorebook (WH Metaphysics) from the source files in codex/:
-//   codex/modes/NN Name.md     → "👁 Name"   (00 is Metaphysics Core, armed whenever any mode is picked)
+//   codex/modes/NN Name.md     → "👁 Name"   (00 is Metaphysics Core, armed whenever any mode is picked, and its two
+//                                parts, armed with the modes in codex-core.js CORE_PARTS)
 //   codex/anchors/NN Name.md   → "⛓ Name"   (depth-0 reminders; Initiative Anchor comes with any mode)
 //   codex/details/NN Mode · topic.md → "📖 Mode · topic" (key: lines, then ---, then the text; fire on topic words)
 // The number prefix only sets the order. Writes codex/WH Metaphysics.json, which ships with the extension; the
@@ -18,6 +19,8 @@ const OUT = path.join(SRC, `${NAME}.json`);
 const ST_WORLD = path.resolve(EXT, '..', '..', '..', '..', '..', 'data', 'default-user', 'worlds', `${NAME}.json`);
 const BAK = path.join(__dirname, 'backups');
 
+// The Core first, then its parts, then the modes.
+const CORE_ORDER = { 'Metaphysics Core': 90, 'Metaphysics Core · bodies': 91, 'Metaphysics Core · several bodies': 92 };
 const files = dir => fs.readdirSync(path.join(SRC, dir)).filter(f => f.endsWith('.md')).sort()
     .map(f => ({ name: f.replace(/^\d+\s+/, '').replace(/\.md$/, ''), text: fs.readFileSync(path.join(SRC, dir, f), 'utf8').replace(/\r\n/g, '\n').replace(/\n$/, '') }));
 
@@ -25,6 +28,7 @@ const README = `{{// ✦ WH Metaphysics — the Worldhopper Codex. Managed by th
 
 Every entry in this book is stored DISABLED on purpose. The extension switches on, per generation:
 • 👁 Metaphysics Core, whenever any mode is picked for the current character
+• 👁 Metaphysics Core · bodies, with any mode where a mind drives a body that isn't its own; · several bodies, with Multipossession, Hive Mind, or Puppetry
 • each 👁 mode picked in the Worldhopper Engine panel (Extensions → Worldhopper Engine → Modes)
 • the ⛓ anchor of each picked mode that has one (depth 0), and ⛓ Initiative Anchor with any mode
 • 📖 detail entries of picked modes, only when their topic words appear in the last two messages (depth 1, sticky 3)
@@ -63,7 +67,7 @@ const add = (comment, content, o = {}) => {
 };
 
 add('✦ README — keep this OFF', README, { order: 1, triggers: [] });
-for (const m of files('modes')) add(`👁 ${m.name}`, m.text, { order: m.name === 'Metaphysics Core' ? 90 : 100 });
+for (const m of files('modes')) add(`👁 ${m.name}`, m.text, { order: CORE_ORDER[m.name] ?? 100 });
 for (const a of files('anchors')) add(`⛓ ${a.name}`, a.text, { position: 4, depth: 0, role: 0 });
 for (const d of files('details')) {
     const [head, ...rest] = d.text.split(/^---$/m);

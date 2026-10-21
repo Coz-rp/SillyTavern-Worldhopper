@@ -1,6 +1,6 @@
 // Worldhopper Engine — Codex core. Which lorebook entries a set of picked modes switches on.
 // Entries are matched by their titles in the WH Metaphysics lorebook:
-//   "👁 Metaphysics Core" · "👁 <Mode>" · "⛓ <Anchor>" · "📖 <Mode> · <topic>"
+//   "👁 Metaphysics Core" (and its two parts, CORE_PARTS) · "👁 <Mode>" · "⛓ <Anchor>" · "📖 <Mode> · <topic>"
 
 export const MODE_GROUPS = [
     ['Occupancy', ['Possession', 'Multipossession', 'Propagation', 'Copy Fidelity', 'Puppetry', 'Skinsuit', 'Hive Mind', 'Body Swap', 'Reverse Vore']],
@@ -30,6 +30,14 @@ export const ANCHOR_FOR = {
 };
 
 export const ALL_MODES = MODE_GROUPS.flatMap(([, modes]) => modes);
+
+// The Metaphysics Core comes with every mode; its two other parts only where they apply, so a mind-only chat (Hypnosis,
+// say) isn't paying for rules about bodies: the body rules wherever a mind drives a body that isn't its own (every
+// occupancy mode), and the rules for one mind running several bodies at once.
+export const CORE_PARTS = {
+    '👁 Metaphysics Core · bodies': MODE_GROUPS.find(([g]) => g === 'Occupancy')[1],
+    '👁 Metaphysics Core · several bodies': ['Multipossession', 'Hive Mind', 'Puppetry'],
+};
 
 // One-line definitions, for card suggestions.
 export const MODE_BLURBS = {
@@ -92,6 +100,7 @@ export function planEntry(title, active, { anchors = true, details = true } = {}
     if (!active.size) return null;
     const t = String(title || '').trim();
     if (t === '👁 Metaphysics Core') return 'constant';
+    if (CORE_PARTS[t]) return CORE_PARTS[t].some(m => active.has(m)) ? 'constant' : null;
     // Characters with a power use it: part of every mode, not a choice.
     if (t === '⛓ Initiative Anchor') return 'constant';
     if (t.startsWith('👁 ')) return active.has(t.slice(2).trim()) ? 'constant' : null;

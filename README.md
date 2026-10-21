@@ -87,7 +87,7 @@ A mode is one kind of metaphysics, with its own rules: how it's done, what the s
 - **Picked per character** (or per group chat). Tap ✏️ to pick, 🪄 to get suggestions from the card, and tap a picked mode to read what it means.
 - **Pick the fewest that carry the card.** Every picked mode is written into every reply, so a mode the card only hints at does more harm than good.
 - **Modifiers** (↳) build on another mode and bring it in with them: Multipossession brings in Possession.
-- **What gets added:** the core rules for your modes; a one-line reminder per mode near the end of the prompt, where it carries the most weight, along with one that characters who have a power use it on their own; and detail entries that switch on when the chat touches their topic, like trance depth or a skinsuit going on.
+- **What gets added:** the core rules, plus the rules for bodies only with modes where a mind drives someone else's body (and the rules for one mind running several bodies only with Multipossession, Hive Mind, or Puppetry), so a Hypnosis chat doesn't pay for them; a one-line reminder per mode near the end of the prompt, where it carries the most weight, along with one that characters who have a power use it on their own; and detail entries that switch on when the chat touches their topic, like trance depth or a skinsuit going on.
 - **Your card wins.** The card sets the specifics (how a power works, what it costs, what the subject remembers); a mode's defaults only fill in what the card leaves out.
 
 <br clear="right">
