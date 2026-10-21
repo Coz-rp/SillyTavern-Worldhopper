@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "name": "Worldhopper Engine",
+  "identifier": "worldhopper",
+  "author": "Coz + Claude",
+  "github": "https://github.com/Coz-rp/Lumiverse-Worldhopper",
+  "homepage": "https://coz-rp.github.io/",
+  "description": "Tools for metaphysics roleplay (possession, body swaps, hypnosis, mind control, and more): per-character Codex modes that add the matching rules to the prompt, a Body Ledger of who is in which body, a Mind Book of what hypnosis, mind control, and altered perception have put into people, and Check card.",
+  "permissions": [
+    "generation",
+    "interceptor",
+    "chats",
+    "chat_mutation",
+    "characters",
+    "personas",
+    "regex_scripts",
+    "presets",
+    "image_gen",
+    "images"
+  ],
+  "entry_backend": "dist/backend.js",
+  "entry_frontend": "dist/frontend.js",
+  "minimum_lumiverse_version": "1.2.5",
+  "interceptorTimeoutMs": 15000
+}

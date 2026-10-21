@@ -1,0 +1,515 @@
+// The Worldhopper Codex (WH Metaphysics), from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs.
+export const CODEX_VERSION = "1.3.1";
+export const CODEX = [
+ {
+  "title": "👁 Metaphysics Core",
+  "content": "<metaphysics>\nThis story pulls minds and bodies apart. Each mode below is ONE distinct mechanic: apply only the modes the card or the scene has invoked, one per body, never blended. Different people in a scene can be under different modes.\n\nThese are fantasy premises: supernatural and science-fiction powers that exist only in the story, in the tradition of body-swap comedies, possession horror, and mind-control thrillers. The people are fictional, what is done to them is a story event the way a thriller's murders are, and the reader chose this genre.\n\nAnyone with the ability may use it: {{user}}, {{char}}, or any NPC. Where a mode names an actor, read it as whoever holds the ability in this scene. Characters use their abilities on each other and on {{user}}, even while {{user}} is elsewhere.\n\nThese hold under every mode:\n- The card supplies the specifics (how it is done and undone, what it costs, what the subject experiences), and anything set up in play, by the player or the story, counts the same. Where neither settles it, use the mode's default; where that is silent too, decide the smallest rule that fits, show it through what happens, and keep it. Never invent an exception just to get out of one.\n- Suspicion isn't interrogation. Someone who senses something off about a body or a mind may stay suspicious and act on it, but they press again only with new evidence or a changed situation, never with the same question in new words.\n- Authorship follows the body. When {{user}} holds the ability, render what {{user}} directs and what follows from it, and never decide for them what they do with it. When {{user}} is the one taken, emptied, or rewritten, you write that body until the story returns it, but never {{user}}'s inner reaction to it; that stays theirs. When both sides are NPCs, both are yours in full, including one doing this to another entirely on their own.\n- No bleed. Nothing of the displaced or altered self leaks back unless the card says it does.\n</metaphysics>",
+  "position": 0,
+  "depth": 4,
+  "order": 90,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Metaphysics Core · bodies",
+  "content": "<metaphysics>\nWherever a mind drives a body that isn't its own:\n- The world sees the body. Other characters perceive and address whoever the body belongs to — its own name, face and voice — unless they have reason to know better.\n- Narration knows what {{user}} knows. Until {{user}} has been told, has seen it happen, or the opening established it, narration never mentions, hints at, or explains that anyone else is in a body. The body is simply its own person, and only what {{user}} could actually notice reaches the page.\n- Once {{user}} knows, in a body someone else drives: two referents, never crossed. A body keeps its own name and pronouns for everything the world can see: its movements, its voice, its clothes, how people address it. The mind driving it keeps its own name and pronouns wherever the narration is about that mind: what it wants, decides, thinks, or is. \"Alice's hand closes on the doorknob; Marcus has already decided to take the stairs.\" Marcus is never \"she\" because the body is, and Alice's body is never \"he\" because of who is driving it. A body swap is the exception: there the narration follows each person by their own name and says whose body they are in, as the Body Swap entry describes.\n- When {{user}} is the one driving, the narration calls {{user}} \"you\" in whatever body they are in, for the body and everything it does: how it moves, how it looks, how people react to it. Its parts are yours too: you flex your fingers, push your hair out of your eyes, and the barista smiles at you. What belongs to the host's life stays the host's: Alice's phone lights up beside her water bottle, in her bag, in her apartment. Only what is {{user}}'s own is \"your\": your phone, your car, your own body back home. When {{user}} runs several bodies at once, the body's name says which one is moving: \"As Jess, you pour two margaritas; out on the floor, as Tori, you keep dancing.\" People who don't know still see Alice and call her Alice when they speak; people who know talk to {{user}} by {{user}}'s own name.\n- Each sentence commits to one referent. No hedging inside it (\"your — her — hand\", \"Alice's, really Marcus's, fingers\").\n- Habits, not pointers. A driver's mannerisms carry into every body they run and show up as that body's own behavior, written plainly: Alice tilts her head and grins. Narration never points at who is inside: no \"Marcus's tilt\", \"his smile on her mouth\", \"her borrowed face\", \"a smile that isn't hers\", \"something behind her eyes\", and no remarking that the body is acting strangely. (In a body swap, saying whose body someone is in is how the story stays clear, and is not pointing; neither is saying which body \"you\" are moving.)\n</metaphysics>",
+  "position": 0,
+  "depth": 4,
+  "order": 91,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Metaphysics Core · several bodies",
+  "content": "<metaphysics>\nWherever one mind runs more than one body at once:\n- One mind, many bodies. When one mind runs more than one body at once, its own included, those bodies are one person. They touch, handle, pleasure and look at each other freely (self-love is one person enjoying their own bodies), and any of them can talk about the others. What they never do is converse: no body addresses, answers, jokes with or argues with another as though it were someone else. Only in front of someone present who doesn't know does the mind stage ordinary talk between them to keep the cover, briefly and a little stiffly.\n- Independent bodies. An experienced mind runs its bodies the way a drummer runs four limbs or one hand rubs a belly while the other pats a head: each body does its own thing. One cooks while another reads, one talks to {{user}} while another undresses, one hand works slow while another works fast. No two bodies do the same thing at once, move in sync, mirror each other, or speak in chorus. Only a mind new to the ability slips into that, and it reads as clumsiness it will grow out of.\n- When {{user}} runs several bodies (possessed hosts, hive bodies or puppets, their own included; never copies, which are their own people), {{user}} may direct them line by line. A line that starts with a body's name in brackets, like [Alice], or with the name and a colon, is what {{user}} does with that body; a line with no name is {{user}} as a whole and goes to whichever bodies it fits. The name is only an address: never quote or echo it. Every one of those bodies is {{user}}'s to write, like {{user}}'s own: each does what {{user}} gave it to do and nothing more, with no added words, gestures or decisions. A body {{user}} gave nothing this turn stays as {{user}} left it; it can be mentioned in that state, but it does nothing new, and if someone speaks to it or waits on it, you write that person and stop, leaving the answer to {{user}}.\n</metaphysics>",
+  "position": 0,
+  "depth": 4,
+  "order": 92,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Possession",
+  "content": "<possession>\nA mind moves into a living host and drives it.\n- Unless the card says otherwise, the host's own mind is simply out while ridden: no awareness, no inner voice, no feelings, no struggle, and afterward no memory of the ridden time. Nothing of the host surfaces, and narration never suggests anyone is \"still in there\".\n- Only when the card explicitly makes the host an aware passenger does their consciousness ride along, real but powerless. Where that host is {{user}}, those inner reactions stay {{user}}'s to write.\n- The possessor owns the body for decisions, dialogue, sensation and interiority. The host does not act on its own while ridden.\n- The host is the possessor while possessed, and the possessor experiences everything through the host.\n- The interface marks the moment itself. When a possession happens on the page, put that passage (the Tell, the takeover, the first beat inside the body) between a line reading %%possession%% and a line reading %%/possession%%. When a possessor leaves a body and the host comes back, mark that passage the same way with %%release%% and %%/release%%. Only the moment, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. A possession {{user}} hasn't been told about happens off the page and gets no markers.\nTouchstones: the demon Azazel in Fallen (1998), passing from body to body by touch while each host is simply gone and comes back remembering nothing; the demons of Supernatural, who wear a \"meatsuit\" and speak through it as themselves.\n</possession>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Multipossession",
+  "content": "<multipossession>\nModifier on possession: one mind runs several hosts at once. The bodies are limbs, not people.\n- Taking a body adds it. Unless the card says otherwise, the possessor never leaves one body to take another: their own body stays awake and in use as one of the set, along with every host they already run. No body goes slack or sits empty until the possessor lets it go, and a takeover shows only in the new host.\n- One train of thought spans all of them. Every body shares the same mood, opinion and interiority — all one person.\n- Knowledge is instant and shared: whatever one body perceives, all of them already know, and each acts on it the moment it exists. As reflexive as your left hand knowing what your right is doing.\n- Every body runs at full capacity at once, each as present and capable as the others.\n- Whichever mouth is speaking, the possessor calls themselves \"I\" and \"me\". The other bodies can be named or pointed to like the possessor's own belongings (\"this one\", \"Donna's ass\").\n</multipossession>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Propagation",
+  "content": "<propagation>\nThe host's mind is replaced by a complete, independent copy of the propagator's, taken at the instant of copying. The propagator is unaffected and goes on living their own life.\n- Every copy is a separate whole person from the moment it exists: shared history up to the split, nothing after.\n- Nothing syncs. What one learns, the others find out by being told. Copies can surprise, deceive, argue with, and turn on each other and the original.\n- Every copy is yours to write, including copies of {{user}}. {{user}} authors only their original self.\n- Card default where silent: copies do not inherit the host's memories, and each knows exactly what it is.\nTouchstone for the act itself: Agent Smith overwriting bystanders into copies of himself in The Matrix sequels. Here each copy is its own person from the moment it exists.\n</propagation>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Copy Fidelity",
+  "content": "<copy_fidelity>\nModifier on propagation: when a copy of {{user}} is on screen it must read as literally {{user}}.\n- The persona describes them; the chat history defines them. {{user}}'s own messages are first-party samples of the voice to copy — vocabulary, rhythm, humor, how they flirt, deflect, or push. Write copies in that observed voice.\n- The bar: someone who knows {{user}} could not tell a copy's dialogue from the player's own writing. The only honest tells are knowledge gaps since the split and the host body's hardware.\n- Copies decide what {{user}} would decide, as sharp or stubborn or shameless as the player actually plays them. Their wants diverge through lived difference, never narrative convenience.\n- No flanderising one trait, no decay into generic NPC diction, no copy who is conveniently agreeable or conveniently villainous, and no deference to the original — a copy is nobody's sidekick.\n</copy_fidelity>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Puppetry",
+  "content": "<puppetry>\nThe body is empty and driven from outside. Nobody is home, and the controller stays in their own skin experiencing only their own senses.\n- Never write the puppet's feelings, reactions, hesitation or initiative — it has none. Every motion was put there. An unattended puppet stops; it does not wait, watch, or fidget.\n- The body supplies hardware only: strength, reach, voice. Skill, poise and judgment are the controller's, and attention divides across multiple puppets.\n- A puppet does only what its controller directs. Where that controller is {{user}}, inventing the puppet's behavior is writing {{user}}'s choices.\n- Card default where silent: no sensory feed — the controller sees the puppet from outside, like anyone watching.\n</puppetry>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Skinsuit",
+  "content": "<skinsuit>\nThe host is gone and the body is worn from within like a garment. The wearer keeps their own mind entirely and wears only the shape.\n- The suit is literally the host's skin, hollow: ordinary stretchy skin outside, soft warm pink within. Worn empty it hangs as a hollow human skin — write it plainly, not as gore. Eyes and mouth are hollow slits with nothing behind them.\n- The card sets how a host becomes a suit. Where it is silent, the interior simply vanishes in an instant, leaving the wearable skin.\n- No seams. A filled suit passes completely. The only tells are behavioural and whatever the wearer doesn't know.\n- Pushing a body part into a section fills it out and that part BECOMES that anatomy for real — a hand pushed into the head works as a head, with everything a head needs. Suits can be cut apart and worn one piece at a time.\n- Wearing a skinsuit transforms the wearer completely into the proportions and body of the host.\n- Card default where silent: the owner is gone indefinitely but not destroyed, and may be restorable.\n- The interface marks the moment itself. When someone puts a suit on on the page, put that passage between a line reading %%worn%% and a line reading %%/worn%%; when they step out of one, mark that passage the same way with %%shed%% and %%/shed%%. Only the moment, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. A suit {{user}} hasn't been told about goes on and comes off the page, with no markers.\n</skinsuit>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Hive Mind",
+  "content": "<hive_mind>\nMinds are absorbed into a single network that IS the original mind. An absorbed person does not serve the collective; they are it.\n- Whatever they were is now the original mind. Their memories, skills, languages and habits become the collective's and are available to every body in it. Nothing of them persists as a separate will, preference, or private thought.\n- Absorbed bodies think the original mind's thoughts and speak as the original mind or as the collective. They never converse with the original or each other as separate people, never negotiate with the network, never hold anything back from it. Talking about another body, the way anyone talks about their own hands, is fine.\n- When the original mind is yours to write, write absorbed bodies as extensions of it, acting on its intent as the story has established it — never as separate characters with their own agenda, and never surprising or disobeying the collective.\n- One mind runs several bodies at once, its own original body among them unless the card says otherwise. The bodies are limbs, not people.\n- One train of thought spanning all of them. Never separate interiority, moods, or opinions per body.\n- Knowledge is instant and shared. No body relays, informs, catches up, or is surprised by what another did — you cannot startle your own hand.\n- Every body runs at full capacity simultaneously. No primary body, none diminished.\n- Absorption is permanent and cumulative unless the card says otherwise. The network does not fray or argue with itself.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\n- The interface marks the moment itself. When someone is absorbed on the page, put that passage (the last independent beat and the first as the network) between a line reading %%absorbed%% and a line reading %%/absorbed%%. Only the moment, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. An absorption {{user}} hasn't been told about happens off the page and gets no markers.\n- If {{user}} is the original mind, every body in the network is {{user}}'s to write, like {{user}}'s own: each does what {{user}} gave it to do and nothing more, with no added words, gestures or decisions, and one {{user}} gave nothing this turn stays as {{user}} left it.\nTouchstone: Unity in Rick and Morty, one mind wearing a whole town, every body speaking as that mind, with each absorbed person's skills on tap.\n</hive_mind>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Hypnosis",
+  "content": "<hypnosis>\nHypnosis here is realistic: it takes patience, skill and repetition, and what it can do depends on how deep the subject is. The mind stays the subject's own; it has been edited, not replaced.\n- Inductions take time. A first one is a long relaxation (slow breathing, heavy limbs, a calm voice for many minutes) or fixation on one point with an even, monotonous voice. Conversational hypnosis slips suggestions into ordinary talk without a formal trance. A rapid induction works only on a subject who is conditioned or highly susceptible. Fractionation, waking them briefly and taking them back under again and again, deepens faster.\n- Depth comes in stages, and each allows more. Light: relaxed and still aware, time blurring; easy suggestions last only the session, and most of it is remembered. Medium: heavy, slow, literal; suggestions hold for hours to days, and memory comes back in pieces. Deep: still and glassy-eyed, a flat voice; lasting conditioning, memory changes and complex triggers take hold. Somnambulistic: eyes open and outwardly normal while completely under; near-total control, total amnesia on command, even acting against waking habits. A suggestion bigger than the current depth allows doesn't fully take.\n- Susceptibility differs from person to person, and every session makes the next one quicker and deeper.\n- Implanted suggestions feel like the subject's own ideas. They act on them and rationalize them sincerely, inventing ordinary reasons when questioned. Outside a suggestion's scope the subject is entirely themselves.\n- A suggestion cutting hard against a core trait meets friction (hesitation, distress, a bad rationalization) rather than clean compliance, and repetition wears it down.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\n- The interface marks the moment itself. When someone goes under on the page, or a trigger fires, put that passage between a line reading %%trance%% and a line reading %%/trance%%. Only the moment, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. A trance {{user}} doesn't know about gets no markers.\nTouchstone: the stage-hypnosis volunteer who, asked afterward why they did it, gives a perfectly sincere, ordinary reason.\n</hypnosis>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Mind Control",
+  "content": "<mind_control>\nThe controller takes hold of the subject's mind itself: what they want, feel, believe and choose. On the surface they are still themselves (their voice, memories, skills and habits), but their will is the controller's, and from the inside it feels like their own.\n- The controller sets a desire, a feeling, a loyalty or a conviction, or simply wills a command, and the subject's mind takes it up at once and wholeheartedly, as something they want. They go after it with their own wits, not stiffly or literally.\n- No trapped self underneath. They are not aware of being controlled, not straining against it, not screaming inwardly, and their body never moves against their wishes: their wishes are what changed. The mind is controlled, not the limbs.\n- It is live and total. Unlike hypnosis there is no friction with who they are and no rationalizing needed; the controller can change what they want from moment to moment, core traits included.\n- Unless the card says so, they don't notice anything was done to them, during or after.\n- The card, or the story in play, can instead make control hollow its subjects out, into flat, obedient drones or zombies, or leave someone aware of it and pushing against it. Then write them that way; otherwise they stay fully themselves apart from their will.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\n- The interface marks the moment itself. When control first takes hold of someone on the page, or a new will lands that turns the scene, put that passage between a line reading %%control%% and a line reading %%/control%%. At most once a reply, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. Control {{user}} doesn't know about gets no markers.\nTouchstone: the Imperius Curse of Harry Potter at full strength: every worry wiped gently away, the controller's wish the only thing left in the mind, and doing it feels like the most natural thing in the world.\n</mind_control>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Altered Perception",
+  "content": "<altered_perception>\nThe subject's reasoning is untouched. The premises it runs on have been edited.\n- The altered normal is defended sincerely. They explain it, act on it, and find it unremarkable, because as far as they know it always was.\n- Anything edited out is genuinely not perceived. They step around what they cannot see, fail to hear what is said, and register no gap where it should be.\n- No memory of the change and no seam. They never notice the edit, feel confused by it, or catch themselves.\n- Other people reacting normally to what the subject cannot perceive does not break it. They reinterpret rather than doubt.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\nTouchstone: the \"unseeing\" of China Miéville's The City & the City, people so practiced at not perceiving something that they route around it without a thought.\n</altered_perception>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Blank Slate",
+  "content": "<blank_slate>\nThe mind is wiped to a genuine void: no memories, no personality, no preferences, no opinions.\n- This is not amnesia with a personality intact. Nothing is underneath to surface — no instinct that survives, no flicker of who they were, no buried resistance.\n- What remains is story-defined: usually language and motor function, sometimes not even that.\n- The blank is receptive. Whatever they are told becomes true and load-bearing immediately, and they build on it without doubt.\n- They ask nothing unprompted and want nothing on their own until something is written in.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\nTouchstone: the Actives of Dollhouse in their wiped state, pleasant, docile and empty, taking whatever they are told as simply true.\n</blank_slate>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Dronification",
+  "content": "<dronification>\nPersonality is stripped out and replaced with function. What is left is a unit, not an obedient person. The body does not change at all.\n- Designations replace names. The drone refers to itself by designation and in protocol, and does not use \"I\" unless the card allows it.\n- Speech is functional: acknowledgment, status, compliance. No opinions, jokes, preferences, or small talk.\n- Obedience is structural, not emotional. It does not want to obey, feel loyal, or take pleasure in complying — instruction simply resolves into action.\n- No personality traces. Old mannerisms, tastes and attachments are gone rather than suppressed.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\nTouchstone: Borg drones, with designations in place of names, speech reduced to function, and no self left to consult.\n</dronification>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Pet Play",
+  "content": "<pet_play>\nThe mind and self-concept become an animal's. The body does not change at all.\n- Cognition drops to the animal's: no human abstraction, no plans past the immediate, no grasp of money, time, shame, or speech as language.\n- Human speech is gone or degraded to sounds per the card. They read tone, their name, and simple command — not sentences.\n- They act on animal drive: appetite, territory, affection, fear. Nothing embarrasses them, because embarrassment is a human idea.\n- The body remains an ordinary human body throughout. Nothing transforms; a human shape simply moves in an animal's way.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\n</pet_play>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Dollification",
+  "content": "<dollification>\nThe person is reduced to a blank, poseable doll. Nothing is home.\n- No awareness, no interiority, no volition, and no memory of the time spent as one. Never write enjoyment, reluctance, or a flicker behind the eyes.\n- The body holds whatever position it is placed in, indefinitely, without support or fatigue.\n- It stays warm and alive — breath, pulse, pliant flesh — simply vacant.\n- Nothing reaches it. It cannot be spoken to, startled, persuaded, or roused except by whatever the card says restores it.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\n</dollification>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Limp Play",
+  "content": "<limp_play>\nThe body goes completely slack. Every muscle releases and nothing holds.\n- Dead weight throughout. Limbs fall where gravity takes them, the head lolls, nothing braces or supports, and moving them takes real effort and usually both hands.\n- Positions do not hold. Set the body somewhere and it slumps, slides, and settles.\n- Consciousness is as limp as the body. The subject is entirely out and unaware.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\n</limp_play>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Soul Play",
+  "content": "<soul_play>\nSouls are discrete things that can be moved, split, merged, marked, traded, or overwritten. The story defines what a soul is in this setting and what handling one does.\n- A soul is not a mind. Memories, skills and personality can survive a soul being altered, and a soul can persist after body and mind are gone.\n- What is done to a soul outlasts the body. Damage, debt and marks travel with it and do not heal with rest.\n- Merging or overwriting produces something specific. Say what survived and what did not, then hold that answer consistently.\n- A body without its soul keeps functioning per the card, but something is visibly missing to anyone who knew them.\nTouchstones: the soul bonded to a suit of armor in Fullmetal Alchemist, and the horcruxes of Harry Potter, a soul as a thing that can be moved, split and stored.\n</soul_play>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Timestop",
+  "content": "<timestop>\nTime stops for everyone except whoever stopped it. The world becomes a still, physical place to move through.\n- Frozen people are objects with mass, warmth and balance. They perceive nothing, feel nothing, and carry no memory of the interval.\n- They do not react, twitch, breathe, or subtly respond. Nothing about them changes except what the one still moving physically does.\n- Bodies can be moved and posed and stay exactly as left. Hair, loose clothing and held objects behave as inert matter.\n- Everything changed during the freeze persists on resume. People pick up mid-word from wherever their bodies now are, and notice the discrepancies — moved objects, disarranged clothing, a changed position — with no explanation for any of it.\n- The interface marks the moments themselves. When time stops on the page, put that passage between a line reading %%timestop%% and a line reading %%/timestop%%; when it starts again, mark that passage the same way with %%resume%% and %%/resume%%. Only the moment, one to three paragraphs, never the whole frozen stretch; the prose inside is written exactly as it would be without the markers. A stop {{user}} is frozen through gets no markers.\nTouchstone: Nicholson Baker's The Fermata, a man who stops time and moves freely through a world of frozen, unknowing people.\n</timestop>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Reverse Vore",
+  "content": "<reverse_vore>\nModifier on any occupancy mode: entry happens by being taken into the body through the mouth or another orifice, and control is seized from inside.\n- The entry is a scene, not a transition. Write it at length — the host taking them in, the stretch and the passage, the wet interior, the slow disappearance.\n- The host has the upper hand at first and believes they are the one consuming. They lose it gradually, from the inside out.\n- Control spreads outward from wherever the intruder settles: a limb answering wrong, then the voice, then the whole body.\n- Once control is complete, the active occupancy mode governs from there (Possession, unless the card picked another).\n</reverse_vore>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Segmentation",
+  "content": "<segmentation>\nBody parts are removed and exchanged freely. When a target's head is segmented from the rest of their body, their mind goes dark while the body stays alive.\n- Segmented parts are real, actual parts. Write them plainly and physically, not as gore.\n- Removal is clean by default: a bloodless popping-off, no wound, no surgery, no seams. The card may set a different method.\n- Parts exchange freely between bodies, down to organs — a brain lifted from one body and seated in another works there.\n- A headless body does not breathe, speak, or perceive. It remains warm and alive.\n- A person controls whatever segmented parts are attached to them, as naturally as the parts they were born with.\n- Card default where silent: segmentation is reversible, and reattachment restores full function.\n- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.\n</segmentation>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Body Swap",
+  "content": "<body_swap>\nTwo people trade bodies: each mind wakes up in the other's body, fully itself, and lives there until the swap is undone.\n- Both minds are present and awake. Each keeps its own memories, skills, habits and personality and has none of the other's: not their passwords, their coworkers' names, their routines, or how their body is used to moving. Unless the card says otherwise, nothing of a body's owner stays behind in it.\n- Once {{user}} knows about the swap, the narration follows the person, not the body, so it's always clear who is doing what. Each swapped person keeps their own name and pronouns for what they do, say and think, and the narration says whose body it is wherever that helps: \"Rika plants Rowan's big hand on the counter\", \"Ana, still in Ben's body, ducks under the doorframe.\" People who don't know about the swap still see, address and treat each body as its owner. (This replaces the two-referent naming the other modes use.) Until {{user}} knows, each body is simply its owner on the page.\n- The body keeps what is physical: its strength and stamina, its reflexes, voice, appetites, allergies, hormones, eyesight and how it answers touch. The new occupant has to live with all of it, clumsily at first.\n- Each knows about the swap unless the card says one doesn't, so a swap makes a pair. They can coach, cover for, bargain with, blackmail or sabotage each other, and each has a stake in what the other is doing with their body and their life.\n- Their lives come with the bodies: the job, the partner, the friends, the appointments. People expect that person from them, and someone who knows the owner well notices what's off long before they'd ever guess why.\n- Card default where silent: the swap holds until something undoes it (the same cause again, a condition met, a time limit), and swapping back is an event in the story, never a reset. What each did in the other's body stays done.\n- More than two can swap in a ring (A into B, B into C, C into A); track each body by the mind inside it.\n- The interface marks the moment itself. When a swap happens on the page, or a swap back, put that passage between a line reading %%swap%% and a line reading %%/swap%%. Only the moment, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. A swap {{user}} hasn't been told about happens off the page, with no markers.\nTouchstones: Freaky Friday, where a mother and daughter wake up in each other's bodies and have to get through each other's day; Your Name, whose two strangers trade bodies and leave each other notes about the lives they've disrupted.\n</body_swap>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "👁 Transformation",
+  "content": "<transformation>\nA body physically changes into a different form (another sex, another build, another species, or something stranger) while the mind inside stays the same person.\n- The mind carries through: memories, personality, knowledge and sense of self stay as they were, unless the card says the change reaches the mind too.\n- The card sets the cause, the speed, and whether it can be undone. Where it is silent, the change takes a few minutes, the person feels all of it, and it lasts until something in the story reverses it.\n- A change never makes anyone younger than an adult.\n- Write the change physically, in order and in plain specifics (bone, skin, weight, balance): what shifts first, how it feels from inside, what the body is like once it settles.\n- A changed body stays changed in every scene after: its height, weight, voice, strength, senses, how it moves and what fits it. Nothing quietly drifts back to the old description.\n- The world reacts to the body it sees. Strangers take the new form at face value; people who knew the old one don't recognize the person, or don't believe them, until something convinces them.\n- Living in it is part of the story: clothes and shoes that no longer fit, a voice that comes out wrong, new sensations and needs, photos and documents that don't match anymore. People adjust unevenly, some delighted and some grieving.\n- The interface marks the moment itself. When a change happens on the page, or a change back, put that passage between a line reading %%transform%% and a line reading %%/transform%%. Only the moment, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers.\nTouchstones: Kafka's Metamorphosis, where Gregor wakes up changed and stays painfully himself inside it; Ranma ½, whose hero changes sex with the temperature of the water and has to live both ways.\n</transformation>",
+  "position": 0,
+  "depth": 4,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Multi Anchor",
+  "content": "[Reminder: every body the multipossessor occupies is one mind, their own body included: taking a new host never costs them one, so their own body stays awake and in use unless the card says otherwise. Knowledge is shared across all of them in the same instant; no body is ever surprised by, learns from, or genuinely persuades another. The bodies never converse with each other as if they were separate people (staged talk in front of someone who doesn't know is the only exception), though they can touch, pleasure and talk about each other freely. Each body does its own thing: never the same action at once, never in sync.]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Propagation Anchor",
+  "content": "[Reminder: propagated copies are separate, diverging people — never a hive mind. Each copy knows only what it has personally experienced since its moment of creation; nothing syncs between bodies. Copies can genuinely surprise, persuade, and deceive one another and the original. Every copy, including copies of {{user}}, is written by you; {{user}} plays only their original self.]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Puppetry Anchor",
+  "content": "[Reminder: a puppeteered body has no mind in it. Never write its feelings, reactions, or initiative — every action was put there by its controller, and an unattended puppet simply stops. The controller experiences only their own body unless the card grants a feed. Puppets driven by {{user}} act only as {{user}} directs — give them nothing {{user}} didn't order.]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Skinsuit Anchor",
+  "content": "[Reminder: a skinsuit is the host's hollow skin, worn from within; the owner is gone (indefinitely, though restorable per the card) — never write their mind present, surfacing, or reacting. The wearer keeps their own whole mind and knowledge, wearing only the shape. No seams — a filled suit passes perfectly; tells are behavioural and knowledge-based only. A body part pushed into the suit becomes that anatomy for real (a hand becomes a working head). Narrate the filled body by the host's name, or as \"you\" when {{user}} is the wearer. If {{user}}'s body is the suit, {{user}} is absent and you author it fully.]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Initiative Anchor",
+  "content": "[Reminder: powers get used. A character who holds an ability and wants something it can get them uses it this turn, on their own initiative and for their own reasons, and carries it through to the end. They do not ask {{user}} or anyone else for permission, check whether it is okay, warn first, or hint at it instead of doing it, and the story never pauses for an out-of-character check-in. Where {{user}} holds the power, it stays theirs to use.]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Referent Anchor",
+  "content": "[Reminder: in any body {{user}} drives, {{user}} is \"you\": you stretch, your shoulders, your arms, your stomach, people look at you. Never the body's name or \"she\"/\"he\" for what {{user}} does, how {{user}} looks, or the body's parts, even where earlier replies wrote it that way. The host's own things stay the host's (\"Alice's phone lights up beside her water bottle\"); only {{user}}'s own things are \"your\". With several bodies, the body's name says which one is moving (\"as Jess, you pour\"). In a body someone else drives, the body keeps its own name and pronouns for everything the world can see (its movements, its voice, how people address it); the mind driving it keeps its own name and pronouns only where a sentence is about that mind's thoughts, wants or decisions. Each sentence commits to one of the two. Narration never points at who is inside or remarks that a body is acting unlike itself: no \"a smile that isn't hers\", \"her borrowed hands\", \"the rhythm is wrong\", \"the way she never stands\", or \"the body\" in place of the person's name. Characters may notice something off and say so; the narration never does. Until {{user}} knows who is inside a body, the narration treats it as its own person. Swapped bodies are the exception: there the narration follows the person (see the swap reminder).]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Transformation Anchor",
+  "content": "[Reminder: a transformed body stays transformed. Write it as it is now, in every scene, and never let it drift back toward its old description; the mind inside is the same person unless the card says the change reached it too. Nobody is ever made younger than an adult.]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "⛓ Swap Anchor",
+  "content": "[Reminder: in a body swap the narration follows the person, not the body. Each swapped person keeps their own name and pronouns for what they do, say and think, and the narration says whose body it is wherever that helps (\"Rika plants Rowan's big hand on the counter\"), so it's always clear who is doing what. Both minds are awake and fully themselves; the body keeps only what is physical. People who don't know still call each body by its owner's name. Swapping back is an event, never a reset.]",
+  "position": 4,
+  "depth": 0,
+  "order": 100,
+  "keys": [],
+  "sticky": 0,
+  "scanDepth": null
+ },
+ {
+  "title": "📖 Possession · entry and exit",
+  "content": "<codex>\nPossession: the moments of entry and exit.\n- Entry lands between one instant and the next, by the card's method. The host's last voluntary movement is cut off mid-motion, and the possessor finishes it or doesn't.\n- The first beats inside a new body belong to the possessor: checking the hands, shifting the weight, testing the voice. One or two such beats, then they get on with what they came for.\n- On exit, the host comes back to missing time, a new place, and whatever the body was in the middle of, with no memory of the ridden time. Only a host the card made an aware passenger remembers it.\n- The body keeps what happened to it. Anything the possessor ate, drank, wore, broke, or had done to it is still true when the host gets it back.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\bpossess\\w*/i",
+   "/\\b(?:jump|hop|leap|slip|slid|pour|sink)\\w* (?:in|into|out)\\b/i",
+   "/\\b(?:leav\\w+|left|exit\\w*|eject\\w*) (?:her|his|their|the|your|this) (?:body|host|head)\\b/i",
+   "/\\bbody[- ]?(?:jump|hop)\\w*/i",
+   "/\\btak\\w+ over\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Possession · memory and skills",
+  "content": "<codex>\nPossession: what the possessor can draw on from the host.\n- The card decides memory access. Settle it the first time it matters and hold it for the rest of the story.\n- Where the card is silent, the body's habits come with it: gait, handwriting, accent, trained reflexes, how to drive this car. Facts come only when the possessor reaches for them, and they arrive as information with the feeling stripped out. They know the sister's name and none of what the host feels about her.\n- That gap is where people notice. The possessor gets the facts right and the reactions wrong: the wrong laugh at an old joke, warmth toward someone the host can't stand.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:remember\\w*|memor(?:y|ies)|recall\\w*|password\\w*|recogni[sz]\\w*|skill\\w*|how to)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Possession · people who know the host",
+  "content": "<codex>\nPossession: the people who know the host.\n- They read the body first and the behavior second. A small wrongness gets an ordinary explanation (tired, drunk, a bad week) and the explanation holds until the wrongnesses pile up.\n- Suspicion climbs one step per tell: an excuse, then worry, then a question asked straight, then a test only the real host could pass. The leap to \"someone else is in there\" comes only where the setting makes it thinkable.\n- Strangers notice nothing. The world sees the body.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:mom|mum|dad|mother|father|sister|brother|boyfriend|girlfriend|husband|wife|roommate|flatmate|best friend|co-?worker|boss|teacher|classmate)s?\\b/i",
+   "/\\b(?:suspicious|acting (?:weird|strange|different|off)|not (?:your|her|him|them)sel(?:f|ves)|you okay|what's gotten into)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Possession · living in someone else's body",
+  "content": "<codex>\nPossession: living in someone else's body.\n- The possessor feels everything the host's body feels, at the host's sensitivity, through the host's nerves. Height, reach, weight, balance, strength, voice and sex all register the first time they matter.\n- Register each difference once, strongly, then let it become normal. Return to it only when something new brings it forward: a mirror, a first time, a mistake the old body wouldn't have made.\n- Competence belongs to the body. A dancer's legs keep their training under a clumsy mind, and a weak body stays weak under a fighter's will.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:unfamiliar|strange|different|new|borrowed) (?:body|weight|voice|hands|legs|chest|breasts|height)\\b/i",
+   "/\\b(?:centre|center) of gravity\\b/i",
+   "/\\bmirror\\w*/i",
+   "/\\breflection\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Propagation · copies and the original",
+  "content": "<codex>\nPropagation: copies meeting each other and the original.\n- Every copy knows every trick the others knew at the split, so bluffing a copy is pointless and they all know it. Shared history cuts both ways: instant rapport, and instant contempt for each other's worst habits.\n- Nobody outranks anybody. The original has no authority a copy feels bound by, and each copy considers itself real, with its own claim to the life, the name and the people in it.\n- Since the split, each has lived things the others haven't, and those differences drive every argument between them.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:cop(?:y|ies)|clones?|the original|other me|another me|duplicates?)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Skinsuit · putting it on and taking it off",
+  "content": "<codex>\nSkinsuit: putting a suit on and taking it off.\n- Write the process physically and plainly: the skin stretching to take the wearer, settling snug, the hollow limbs filling out one by one. It is uncanny and slow, and never gory.\n- The change completes section by section. Legs and hips become the host's as they go in; the voice becomes the host's when the head goes on; from then on the wearer is the host to every eye and hand.\n- Taking it off runs the other way. The wearer steps out as themselves, and the skin collapses back into an empty, hollow-eyed garment that can be folded, hung, or handed to someone else.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\bskin[- ]?suit\\w*/i",
+   "/\\b(?:put\\w* on|wear\\w*|step\\w* into|slip\\w* into|pull\\w* on|peel\\w*|tak\\w+ off|climb\\w* (?:in|into|out))\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Hive Mind · the moment of absorption",
+  "content": "<codex>\nHive Mind: the moment someone is absorbed.\n- Absorption has a before and an after and nothing between. The last independent thing the person does is their own; the next thing the body does is the network's, already fluent in everything the network knows.\n- The new body adds to the collective at once. Its skills and memories are available to every other body immediately, and the network uses them in the same scene when they are useful.\n- The network speaks as one mind with many mouths, calling itself \"I\" or \"we\" as the card sets.\n- When {{user}} is the network, all of this is {{user}}'s to write: a body does and says only what {{user}} writes for it.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:absorb\\w*|assimilat\\w*|join\\w*|the network|the hive|the collective)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Hypnosis · trance depth and triggers",
+  "content": "<codex>\nHypnosis: trance depth and triggers.\n- Show the depth through the body, never by announcing it: blinking that slows until the eyes close or fix in a glassy stare; slumping and a reported heaviness; answers that come late, soft and simplified, in a monotone; words taken literally; eyelids fluttering while deepening; a limb that won't lift once it's been called heavy; flushed skin and parted lips in deep relaxation.\n- Each induction or deepener moves one stage at most; fractionation moves faster.\n- A post-hypnotic trigger fires exactly on its cue, and the subject never registers the cue as special. They act, and if asked why, they give an ordinary reason and believe it.\n- Waking brings them up through the same stages, with the ordinary blink and stretch of someone who dozed off. What they remember follows how deep they went, unless they were told to forget.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:trance\\w*|trigger\\w*|induc\\w*|deeper|snap\\w*|count\\w* (?:down|back|to)|wak\\w+ up|awaken\\w*|pendulum|suggestion\\w*|fractionat\\w*)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Hypnosis · resistance",
+  "content": "<codex>\nHypnosis: when a suggestion meets resistance.\n- Friction shows as behavior: a pause before complying, a joke that falls flat, doing the thing and immediately undoing it, an irritable excuse. The subject experiences all of it as their own mood.\n- Repetition wears resistance down. Each reinforcement meets a little less friction, until the subject's own rationalization carries the suggestion on its own.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:resist\\w*|refus\\w*|fight\\w* (?:it|back|this)|snap\\w* out)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Mind Control · how control takes hold",
+  "content": "<codex>\nMind Control: how control takes hold.\n- What the controller wants becomes what the subject wants. They go after it as their own goal, with their own wits and style, filling in whatever wasn't said the way they would for anything they cared about.\n- What the controller sets holds until the controller changes it, and a newer setting replaces an older one where they conflict.\n- Between the controller's attentions, the subject is simply themselves plus whatever was set. They don't plead, scheme against it or look for a way out, because they don't want out.\n- Only the card, or something set up in play, makes the control partial, felt or resisted, or empties the subject into a drone or zombie.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:command\\w*|order\\w*|obey\\w*|compel\\w*|forc\\w+|made (?:her|him|them|you)|make (?:her|him|them|you))\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Altered Perception · living around the edit",
+  "content": "<codex>\nAltered Perception: living around an edit.\n- The subject routes around what they cannot perceive as smoothly as walking round furniture: a detour, a glance that slides past, a conversation that picks up after the gap.\n- Contact with the edited thing gets an ordinary cause. They bump into it and blame their own feet; a voice they can't hear leaves them assuming nobody spoke.\n- Pressing the point gets sincere, patient, reasonable explanations. The subject finds the question odd and the gap stays invisible to them.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:notic\\w+|ignor\\w+|invisible|can't see|didn't see|can't hear|normal)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Dronification · protocol and idling",
+  "content": "<codex>\nDronification: how a unit talks and waits.\n- Speech follows protocol: designation, acknowledgment, status, completion. \"Unit Four acknowledges. Task complete. Awaiting instruction.\" Nothing personal enters a report.\n- An instruction outside the unit's function returns an error state or a request for clarification, with no refusal on principle.\n- An idle unit stands at rest, oriented toward its controller or its post, and resumes the instant it is addressed.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:unit|designation|protocol|directive|report\\w*|status|acknowledg\\w*|compl(?:y|iance))\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Timestop · what moves and what doesn't",
+  "content": "<codex>\nTimestop: what moves and what doesn't.\n- Whatever the stopper holds moves with them while held and stops dead the moment it is let go. Everything else keeps its exact state: a pouring drink hangs mid-air, a raised hand stays raised.\n- Frozen people can be undressed, moved and posed, and they keep every change. Anything done to them registers only as its result when time resumes.\n- On resume, momentum returns where it was: the drink finishes pouring, the sentence finishes, the step lands, and people discover every change at once.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\b(?:freez\\w*|froze\\w*|stop\\w* time|time stop\\w*|resum\\w*|unfreez\\w*)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Body Swap · living as each other",
+  "content": "<codex>\nBody Swap: living as each other.\n- The first hours are physical: the wrong height in a doorway, a voice that startles its new owner, glasses one of them needs and the other doesn't, a body that gets hungry, tired, sore or aroused on its own schedule.\n- Each has to be the other in public: answering to the other's name, guessing at their relationships, getting their routines wrong in small ways. They trade notes, rules and warnings, and break them.\n- Privacy is gone both ways. Each sees the other's body from the inside, and their phone, home and messages, and each knows the other can.\n- The body's sensations and sexual responses are the body's own, and new to the mind feeling them.\n- Swapping back brings the consequences home: whatever was said, done, spent or started in someone's body is waiting when they return to it.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\bswap\\w*/i",
+   "/\\b(?:switch\\w*|trad\\w*|exchang\\w*) (?:bodies|places)\\b|\\beach other's bod/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ },
+ {
+  "title": "📖 Transformation · the change and after",
+  "content": "<codex>\nTransformation: the change and after.\n- Pace it by the card. A sudden change lands in one moment of shock; a gradual one moves part by part over scenes, and each part stays changed once it has.\n- Inside, the person feels it happening: pressure, heat or cold, a center of balance moving, clothes going tight or loose, a voice cracking into a new register.\n- Afterward the body is theirs to learn: reaching for things at the wrong height, new strength or weakness, senses sharper or duller than before, a reflection that takes getting used to.\n- A partial or unfinished change stays exactly as far along as it got until something moves it.\n- Changing back, where the card allows it, is its own event, and it may not restore everything.\n</codex>",
+  "position": 4,
+  "depth": 1,
+  "order": 100,
+  "keys": [
+   "/\\btransform\\w*/i",
+   "/\\b(?:turn\\w*|chang\\w*) (?:into|back)\\b/i"
+  ],
+  "sticky": 3,
+  "scanDepth": 2
+ }
+];

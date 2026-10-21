@@ -1,0 +1,13 @@
+{
+  "name": "lumiverse-worldhopper",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node tools/sync-core.cjs",
+    "build": "node tools/build.cjs",
+    "dev": "node tools/build.cjs && node tools/dev-install.cjs"
+  },
+  "devDependencies": {
+    "jquery": "3.7.1"
+  }
+}
