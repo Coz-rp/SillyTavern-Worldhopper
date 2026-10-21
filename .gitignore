@@ -1,1 +1,3 @@
 node_modules/
+# Local-only tools (they name this install's paths)
+*.local.*
