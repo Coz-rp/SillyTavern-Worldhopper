@@ -2,7 +2,7 @@
 
 Tools for metaphysics roleplay in [Lumiverse](https://lumiverse.chat): possession, body swaps, hypnosis, mind control, skinsuits, hive minds, dolls, time stops, and every other way to take someone apart and put them back wrong.
 
-This is the Lumiverse version of the [Worldhopper Engine for SillyTavern](https://github.com/Coz-rp/SillyTavern-Worldhopper). Both share the same Codex and the same Ledger, Mind Book, and card-check logic; only the parts that talk to the app are different.
+This is the Lumiverse version of the [Worldhopper Engine for SillyTavern](https://github.com/Coz-rp/SillyTavern-Worldhopper), and it lives on the `lumiverse` branch of the same repository. Both share the same Codex and the same Ledger, Mind Book, and card-check logic; only the parts that talk to the app are different.
 
 ## What it does
 
@@ -17,9 +17,13 @@ This is the Lumiverse version of the [Worldhopper Engine for SillyTavern](https:
 
 ## Install
 
-1. In Lumiverse, open **Extensions** and install from this repository's URL.
-2. Grant the permissions it asks for (see below), and enable it.
-3. Open the **Worldhopper** tab in the drawer, then **Settings → Models**, and pick a connection for the background jobs.
+1. In Lumiverse, open **Extensions**, click **Add Extension**, and paste this repository's URL under **Install from Source**:
+   `https://github.com/Coz-rp/SillyTavern-Worldhopper`
+2. Set **Branch** to **lumiverse**. The default branch holds the SillyTavern version, which Lumiverse can't install.
+3. Click **Install from Source**, grant the permissions it asks for (see below), and enable it.
+4. Open the **Worldhopper** tab in the drawer, then **Settings → Models**, and pick a connection for the background jobs.
+
+**Updates:** **Update** on the extension's card pulls the newest version from the `lumiverse` branch.
 
 ### Pick a fast, cheap model
 
@@ -54,11 +58,11 @@ The Worldhopper presets (on the [Worldhopper site](https://coz-rp.github.io/)) m
 
 ```
 bun install
-node tools/sync-core.cjs   # the shared core modules and the Codex, from the SillyTavern Engine
-node tools/build.cjs       # dist/backend.js and dist/frontend.js
+node tools/sync-core.cjs <SillyTavern Engine folder>   # the shared core modules and the Codex
+node tools/build.cjs                                  # dist/backend.js and dist/frontend.js
 ```
 
-The core modules in `src/core/` come from the SillyTavern Engine; change them there.
+The core modules in `src/core/` come from the SillyTavern Engine (a checkout of this repository's default branch); change them there.
 
 ## License
 

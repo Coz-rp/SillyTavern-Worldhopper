@@ -3,7 +3,7 @@
   "name": "Worldhopper Engine",
   "identifier": "worldhopper",
   "author": "Coz + Claude",
-  "github": "https://github.com/Coz-rp/Lumiverse-Worldhopper",
+  "github": "https://github.com/Coz-rp/SillyTavern-Worldhopper/tree/lumiverse",
   "homepage": "https://coz-rp.github.io/",
   "description": "Tools for metaphysics roleplay (possession, body swaps, hypnosis, mind control, and more): per-character Codex modes that add the matching rules to the prompt, a Body Ledger of who is in which body, a Mind Book of what hypnosis, mind control, and altered perception have put into people, and Check card.",
   "permissions": [
