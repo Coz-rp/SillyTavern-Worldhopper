@@ -1,5 +1,5 @@
-// The Worldhopper Codex (WH Metaphysics), from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs.
-export const CODEX_VERSION = "1.3.1";
+// The Worldhopper Codex (WH Metaphysics), from the SillyTavern Worldhopper Engine 1.3.2 by tools/sync-core.cjs.
+export const CODEX_VERSION = "1.3.2";
 export const CODEX = [
  {
   "title": "👁 Metaphysics Core",

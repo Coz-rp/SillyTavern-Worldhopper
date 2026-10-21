@@ -1,4 +1,4 @@
-// Synced from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs. Edit it there, not here.
+// Synced from the SillyTavern Worldhopper Engine 1.3.2 by tools/sync-core.cjs. Edit it there, not here.
 // Worldhopper Engine — text helpers the Ledger's checks share. Pure functions, no SillyTavern imports.
 // (The WH Editor, a separate extension, keeps its own copies in its editor-core.js.)
 

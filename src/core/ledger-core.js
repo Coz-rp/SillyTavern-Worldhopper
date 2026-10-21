@@ -1,4 +1,4 @@
-// Synced from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs. Edit it there, not here.
+// Synced from the SillyTavern Worldhopper Engine 1.3.2 by tools/sync-core.cjs. Edit it there, not here.
 // Worldhopper Engine — Body Ledger core. Pure functions (no SillyTavern imports).
 // The ledger records every body not driven by its own mind, every empty body, every mind outside its own body,
 // and who holds which power. A local model updates it after each reply; it is injected at depth 1 so the

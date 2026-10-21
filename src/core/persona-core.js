@@ -1,4 +1,4 @@
-// Synced from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs. Edit it there, not here.
+// Synced from the SillyTavern Worldhopper Engine 1.3.2 by tools/sync-core.cjs. Edit it there, not here.
 // Host personas: for each body someone else has taken over (Possession, Skinsuit, Hive Mind, Puppetry and the other
 // body modes), a short sheet on who that person is in their own life, the way the user's own persona describes them.
 // Written once, the first time the Ledger shows the body taken, kept with the chat, and given to the model while the

@@ -1,4 +1,4 @@
-// Synced from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs. Edit it there, not here.
+// Synced from the SillyTavern Worldhopper Engine 1.3.2 by tools/sync-core.cjs. Edit it there, not here.
 // Worldhopper Engine — card tools. Pure functions (no SillyTavern imports).
 //   Make card:   read the labeled blocks a card-builder chat produced ("--- DESCRIPTION (→ "Description") ---" …),
 //                latest version of each winning, and assemble a Character Card V2 with its Codex modes.

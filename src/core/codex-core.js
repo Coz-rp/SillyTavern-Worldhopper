@@ -1,4 +1,4 @@
-// Synced from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs. Edit it there, not here.
+// Synced from the SillyTavern Worldhopper Engine 1.3.2 by tools/sync-core.cjs. Edit it there, not here.
 // Worldhopper Engine — Codex core. Which lorebook entries a set of picked modes switches on.
 // Entries are matched by their titles in the WH Metaphysics lorebook:
 //   "👁 Metaphysics Core" (and its two parts, CORE_PARTS) · "👁 <Mode>" · "⛓ <Anchor>" · "📖 <Mode> · <topic>"

@@ -1,4 +1,4 @@
-// Synced from the SillyTavern Worldhopper Engine 1.3.1 by tools/sync-core.cjs. Edit it there, not here.
+// Synced from the SillyTavern Worldhopper Engine 1.3.2 by tools/sync-core.cjs. Edit it there, not here.
 // Worldhopper Engine — Mind Book core. Pure functions (no SillyTavern imports), so the same code runs in the
 // browser extension and in Node tests and evals.
 //
