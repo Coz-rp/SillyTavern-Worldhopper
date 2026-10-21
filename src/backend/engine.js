@@ -18,7 +18,7 @@ import {
 } from '../core/ledger-core.js';
 import { MIND_MODES, KINDS as MIND_KINDS, EMPTY_BOOK, normalizeBook, needsUpdate, buildMindMessages, applyMindUpdate, trappedSelfCuts, resistanceSetUp } from '../core/mind-core.js';
 import { describesMinor, buildPersonaMessages, parsePersona, personaKey, buildLookMessages, parseLook, portraitPrompt } from '../core/persona-core.js';
-import { sp, user, log, warn, settings, on, loadChat, writeSnap, headSnap, ask, cardText, saveChatState } from './host.js';
+import { sp, user, log, warn, settings, on, loadChat, writeSnap, headSnap, ask, cardText, saveChatState, seen, seenText } from './host.js';
 
 export const SCENE_MESSAGES = 4;   // who is "in the scene": named in this many of the latest messages
 export const RECENT_REPLIES = 30;  // "Build history" can read just this many of the latest replies instead of the whole chat
@@ -441,14 +441,6 @@ function editRecord(prev, before, after, applied) {
         : { original: before, edited: after, applied, at: Date.now() };
 }
 
-// What each reply's text was when Worldhopper last read or wrote it. Lumiverse sends MESSAGE_EDITED for any change to a
-// message, its metadata included (every Ledger snapshot is one), so only a change to the text itself counts as an edit.
-const seenText = new Map();   // messageId → text
-export function seen(id, text) {
-    seenText.delete(id);
-    seenText.set(id, text);
-    if (seenText.size > 2000) seenText.delete(seenText.keys().next().value);
-}
 
 /** Writes a fixed reply, if the reply is still what was checked (same swipe, same text). */
 async function applyFix(chatId, messageId, original, text, applied) {
@@ -546,6 +538,7 @@ export const noteWait = (chatId, ms) => lastWait.set(chatId, ms);
 
 /** After a reply lands: the Ledger, the Mind Book, the checks, then notes, sheets and pictures. */
 export function onReply(chatId, messageId) {
+    lastReread.set(messageId, Date.now());   // this run reads it; the host's own follow-up writes to it aren't edits
     const done = hold(chatId);
     const wait = lastWait.get(chatId) || 0;
     lastWait.delete(chatId);
@@ -600,11 +593,11 @@ export function onReply(chatId, messageId) {
 // Editing the newest reply has the Ledger and the Mind Book read it again, so what they hold matches the page. Older
 // replies aren't re-read: every snapshot after them was built on the old text.
 const editTimers = new Map();
-const lastReread = new Map();   // messageId → when it was last re-read: never more than once in 10 s, whatever fires
+const lastReread = new Map();   // messageId → when it was last re-read: never more than once in 15 s, whatever fires
 export function onEdited(chatId, messageId, content) {
     if (typeof content !== 'string' || seenText.get(messageId) === content) return;
     seen(messageId, content);
-    if (Date.now() - (lastReread.get(messageId) || 0) < 10000) return;
+    if (Date.now() - (lastReread.get(messageId) || 0) < 15000) return;
     clearTimeout(editTimers.get(chatId));
     editTimers.set(chatId, setTimeout(() => rereadReply(chatId, messageId), 500));
 }

@@ -171,6 +171,11 @@ function renderPanel() {
             card.append($('<div class="wh-suggestion"></div>').append($('<span></span>').text(`Suggested: ${st.suggestion.join(', ')}`),
                 $('<button type="button" class="menu_button">Apply</button>').on('click', () => call('applySuggestion'))));
         }
+        if (st?.presetNudge?.length) {
+            const n = st.presetNudge;
+            card.append($('<div class="wh-suggestion"></div>').append($('<span></span>').text(
+                `Your preset has ${n.join(' and ')} switched off. ${n.length > 1 ? 'They help' : 'It helps'} the model keep bodies and minds straight: switch ${n.length > 1 ? 'them' : 'it'} on in the Preset tab.`)));
+        }
         if (open && t) card.append(modePicker(picked, { onChange: modes => call('setModes', { modes }) }));
         panel.append(card);
 

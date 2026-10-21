@@ -183,8 +183,18 @@ export async function setPicks(c, list) {
 // Kept in the message's metadata under the swipe it belongs to, so swipes and deletes roll the Ledger and the Mind
 // Book back: { wh: { s: { <swipe key>: { ledger, mind, history, edit, timing } } } }.
 
+// What each message's text was when Worldhopper last read or wrote it. Lumiverse sends MESSAGE_EDITED for any change to
+// a message, its metadata included (every snapshot below is one), so only a change to the text itself counts as an edit.
+export const seenText = new Map();   // messageId → text
+export function seen(id, text) {
+    seenText.delete(id);
+    seenText.set(id, text);
+    if (seenText.size > 2000) seenText.delete(seenText.keys().next().value);
+}
+
 /** Merges `patch` into a message's snapshot (a key set to undefined is dropped), and its text when `content` is given. */
 export async function writeSnap(c, msg, patch, { content } = {}) {
+    seen(msg.id, typeof content === 'string' ? content : msg.text);
     const meta = { ...(msg.raw.metadata || {}) };
     const wh = { ...(meta.wh || {}) };
     const s = { ...(wh.s || {}) };
@@ -232,12 +242,18 @@ export async function ask(job, messages, maxTokens, temperature, { signal } = {}
     // connection, else the connection's own. (No preset is laid over it, so the RP preset's samplers stay out.)
     const conn = await connectionInfo(connection);
     calls[job === 'notes' ? 'notes' : 'ledger']++;
+    // Some cloud models think before every answer and can't be told not to (Claude Sonnet 5.5 on OpenRouter: "reasoning
+    // is mandatory"), and that thinking counts against max_tokens: a yes/no check capped at 60 came back empty. So a
+    // cloud model gets headroom over what the job writes; it's a ceiling, not a cost. A local model keeps the job's own
+    // cap, so a rambling one stops where the job expects.
+    const local = LOCAL_PROVIDERS.test(String(conn?.provider || ''));
     const res = await sp.generate.raw({
         type: 'raw', messages, connection_id: connection, model: model || conn?.model || '',
-        parameters: { max_tokens: maxTokens, temperature }, reasoning: { source: 'off' }, userId: user(), signal,
+        parameters: { max_tokens: local ? maxTokens : maxTokens + 2000, temperature }, reasoning: { source: 'off' }, userId: user(), signal,
     });
     return String(res?.content ?? '');
 }
+const LOCAL_PROVIDERS = /kobold|ollama|llama|lmstudio|lm_studio|tabby|vllm|textgen|ooba|aphrodite|local|custom/i;
 const connCache = new Map();   // id → { at, value }: a connection's details, for a minute
 async function connectionInfo(id) {
     const hit = connCache.get(id);

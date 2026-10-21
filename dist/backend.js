@@ -1989,7 +1989,15 @@ async function setPicks(c, list) {
   c.picks = list;
   c.modes = [...expandModes(list)];
 }
+var seenText = new Map;
+function seen(id, text) {
+  seenText.delete(id);
+  seenText.set(id, text);
+  if (seenText.size > 2000)
+    seenText.delete(seenText.keys().next().value);
+}
 async function writeSnap(c, msg, patch, { content } = {}) {
+  seen(msg.id, typeof content === "string" ? content : msg.text);
   const meta = { ...msg.raw.metadata || {} };
   const wh = { ...meta.wh || {} };
   const s = { ...wh.s || {} };
@@ -2035,18 +2043,20 @@ async function ask(job, messages, maxTokens, temperature, { signal } = {}) {
     throw new Error("no model picked (Worldhopper \u2192 Settings \u2192 Models)");
   const conn = await connectionInfo(connection);
   calls[job === "notes" ? "notes" : "ledger"]++;
+  const local = LOCAL_PROVIDERS.test(String(conn?.provider || ""));
   const res = await sp.generate.raw({
     type: "raw",
     messages,
     connection_id: connection,
     model: model || conn?.model || "",
-    parameters: { max_tokens: maxTokens, temperature },
+    parameters: { max_tokens: local ? maxTokens : maxTokens + 2000, temperature },
     reasoning: { source: "off" },
     userId: user(),
     signal
   });
   return String(res?.content ?? "");
 }
+var LOCAL_PROVIDERS = /kobold|ollama|llama|lmstudio|lm_studio|tabby|vllm|textgen|ooba|aphrodite|local|custom/i;
 var connCache = new Map;
 async function connectionInfo(id) {
   const hit = connCache.get(id);
@@ -3470,13 +3480,6 @@ async function updateMind(c, mesId) {
 function editRecord(prev, before, after, applied) {
   return prev && prev.edited === before ? { original: prev.original, edited: after, applied: [...prev.applied || [], ...applied], at: Date.now() } : { original: before, edited: after, applied, at: Date.now() };
 }
-var seenText = new Map;
-function seen(id, text) {
-  seenText.delete(id);
-  seenText.set(id, text);
-  if (seenText.size > 2000)
-    seenText.delete(seenText.keys().next().value);
-}
 async function applyFix(chatId, messageId, original, text, applied) {
   const c = await loadChat(chatId);
   const msg = c?.msgs.find((m) => m.id === messageId);
@@ -3580,6 +3583,7 @@ function noteTiming(chatId, t) {
 var lastWait = new Map;
 var noteWait = (chatId, ms) => lastWait.set(chatId, ms);
 function onReply(chatId, messageId) {
+  lastReread.set(messageId, Date.now());
   const done = hold(chatId);
   const wait = lastWait.get(chatId) || 0;
   lastWait.delete(chatId);
@@ -3648,7 +3652,7 @@ function onEdited(chatId, messageId, content) {
   if (typeof content !== "string" || seenText.get(messageId) === content)
     return;
   seen(messageId, content);
-  if (Date.now() - (lastReread.get(messageId) || 0) < 1e4)
+  if (Date.now() - (lastReread.get(messageId) || 0) < 15000)
     return;
   clearTimeout(editTimers.get(chatId));
   editTimers.set(chatId, setTimeout(() => rereadReply(chatId, messageId), 500));
@@ -4294,7 +4298,100 @@ async function saveLook(chatId, name, text) {
 
 // src/core/card-core.js
 var estimateTokens = (s) => Math.round(String(s || "").length / 4.4);
+var tokens2 = estimateTokens;
 var COMMON_WORDS = new Set("angel april art author autumn bill cal chase dawn drew eight faith five four grace grant guy hope hunter jack joy june kai mark max may nine one pat ray rich rose sam seven six sky star sue summer ten three two will".split(" "));
+var OCCUPANCY = ["Possession", "Multipossession", "Skinsuit", "Hive Mind", "Reverse Vore", "Propagation", "Puppetry"];
+var MULTI2 = ["Multipossession", "Hive Mind"];
+var NEGATED = /\b(don'?t|doesn'?t|didn'?t|never|not|no|won'?t|can'?t|isn'?t|aren'?t|without)\b[^.!?\n]*$/i;
+var YOUTH_CUES = /\b(high[- ]?school(ers?)?|school[- ]?(girls?|boys?|uniforms?)|schools?|campus|college|universit(y|ies)|dorm(itory|itories|s)?|students?|classmates?|freshm[ae]n|sophomores?|teens?|teenage(rs?)?|petite|childlike)\b/i;
+var AGE_STATED = /\b(1[89]|[2-9]\d)[- ]?(years?[- ]old|y\.?o\b|yrs?\b)|\bage[ds]?\b[^.\n]{0,12}\b(1[89]|[2-9]\d)\b|\((1[89]|[2-9]\d)\)|,\s*(1[89]|[2-9]\d)\s*[,.;)]|\u2014\s*(1[89]|[2-9]\d)\s*([,.;)]|-?years?\b)|\b(eighteen|nineteen|(twenty|thirty|forty|fifty)(-\w+)?)[- ](plus|years?[- ]olds?)\b|\b(early|mid|late)?[- ]?(twenties|thirties|forties|fifties|[2-5]0s)\b|\badults?\b|\b18\+/i;
+function snippet(text, at, len) {
+  let a = Math.max(0, at - 70), b = Math.min(text.length, at + len + 50);
+  if (a > 0)
+    a = text.indexOf(" ", a) + 1 || a;
+  if (b < text.length && text.lastIndexOf(" ", b) > at + len)
+    b = text.lastIndexOf(" ", b);
+  return (a > 0 ? "\u2026" : "") + text.slice(a, b).replace(/\s+/g, " ").trim() + (b < text.length ? "\u2026" : "");
+}
+function findHit(re, text) {
+  text = String(text || "");
+  const g = new RegExp(re.source, re.flags.replace("g", "") + "g");
+  for (let m;m = g.exec(text); ) {
+    if (NEGATED.test(text.slice(Math.max(0, m.index - 40), m.index)))
+      continue;
+    return snippet(text, m.index, m[0].length);
+  }
+  return null;
+}
+function doctorCard(d, { userNames = [], modes = [], tool = false, alwaysTokens = null, preferCard = { system: true, postHistory: true } } = {}) {
+  const out = [];
+  const warn = (title, detail, quote) => out.push({ level: "warn", title, detail, ...quote ? { quote } : {} });
+  const info = (title, detail, quote) => out.push({ level: "info", title, detail, ...quote ? { quote } : {} });
+  const scene = [d.first_mes, ...d.alternate_greetings || [], d.mes_example].filter(Boolean).join(`
+`);
+  const all = [d.description, d.personality, d.scenario, d.post_history_instructions, scene].filter(Boolean).join(`
+`);
+  const phi = d.post_history_instructions?.trim();
+  if (!tool && phi && preferCard.postHistory !== false && !/\{\{original\}\}/i.test(phi)) {
+    warn("Post-history replaces your preset's", "This card has post-history instructions without {{original}}, so in its chats they replace your preset's own post-history block (formatting rules, banned-words checks and the like). Put {{original}} on the first line to keep both.");
+  } else if (!tool && phi && preferCard.postHistory === false) {
+    info("Card's post-history is ignored", `SillyTavern's "Prefer Char. Instructions" is off, so your preset's post-history is used and this card's is not sent.`);
+  }
+  if (!tool && d.system_prompt?.trim() && preferCard.system !== false && !/\{\{original\}\}/i.test(d.system_prompt)) {
+    warn("System prompt replaces your preset's", "This card sets its own main prompt without {{original}}, so it replaces your preset's. Most cards don't need one.");
+  }
+  const always = alwaysTokens ?? tokens2([d.description, d.personality, d.scenario].join(`
+`));
+  if (tool) {} else if (always > 2000)
+    warn(`About ${always} tokens sent with every reply`, "Description, personality and scenario go into every single prompt. Aim for under ~1,500: move world detail, extra characters and places into a lorebook, which is only sent when they come up.");
+  else if (always > 1500)
+    info(`About ${always} tokens sent with every reply`, "A little heavy. World detail and side characters could move into a lorebook.");
+  for (const nm of [...new Set(userNames)].filter((n) => n && n.length > 2 && !COMMON_WORDS.has(n.toLowerCase()))) {
+    const re = new RegExp(`\\b${nm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+    const m = re.exec(all);
+    if (m)
+      warn(`Uses "${nm}" instead of {{user}}`, `Your persona's name is written into the card; it breaks under any other persona. Use {{user}}.`, snippet(all, m.index, m[0].length));
+  }
+  const mindControl = modes.includes("Mind Control") || /\bmind[- ]control/i.test(all);
+  const trapped = mindControl && findHit(/(trapped|locked|imprisoned)\s+(inside|in\s+(her|his|their)\s+(own\s+)?(head|body|mind))|scream(s|ing)?\s+(inside|inwardly|silently)|fully aware\s+(but|while)|aware\s+but\s+(can'?t|unable)/i, all);
+  if (trapped) {
+    warn("Mind control written as a trapped, aware victim", "The Codex treats mind control as control of the mind itself (wants and feelings changed, felt as the subject's own). A victim screaming inside an obeying body is body control. Keep it only if that is what this card is about, and say so plainly.", trapped);
+  }
+  if (modes.some((m) => OCCUPANCY.includes(m)) && !/\b(aware|unaware|conscious|memory|memories|remember|recall|suppress|asleep|dormant|gone|passenger|blank|recollection|blacks? out)\b/i.test([d.description, d.post_history_instructions, d.scenario].join(`
+`))) {
+    info("Doesn't say what the host experiences", "Nothing says whether the host is aware or remembers anything, so the Codex default applies: simply gone, no memory afterward. Say so if you want something else.");
+  }
+  const multi = modes.some((m) => MULTI2.includes(m));
+  const talking = multi && findHit(/(talk(s|ing)?|chat(s|ting)?|banter(s|ing)?|argu(e|es|ing))\s+(to|with)\s+(each other|one another|themselves)|finish(es|ing)?\s+(each other'?s|one another'?s|his|her|their|a)\s+sentences?/i, all);
+  if (talking) {
+    warn("Bodies talking to each other", "The card has one mind's bodies talking to each other. The Codex rule: they can talk about each other and touch freely, but never converse as separate people (except staged in front of someone who doesn't know).", talking);
+  }
+  const sync = multi && findHit(/\b(in (perfect )?(sync|unison)|in chorus|mirror(s|ing)? each other|at the exact same (time|moment|instant)|at the same (moment|instant))\b/i, all);
+  if (sync) {
+    warn("Bodies moving in sync", "The card describes bodies acting in unison. The Codex rule: each body does its own thing; sync is only for a mind new to the ability.", sync);
+  }
+  const pointer = findHit(/(borrowed (body|face|mouth|hands?|eyes)|someone else'?s (eyes|smile|voice|mouth)|(his|her|their) smile on (her|his|their) (face|mouth)|something behind (her|his|their) eyes|a smile that isn'?t (hers|his|theirs))/i, scene);
+  if (pointer) {
+    warn("Possession pointers in the greetings", `The opening narration points out who is inside ("borrowed body", "his smile on her face"). The model copies the first message's style, so it will keep doing it. Write the habits as the body's own behavior.`, pointer);
+  }
+  const youthful = !tool && findHit(YOUTH_CUES, all);
+  const book = (d.character_book?.entries || []).map((e) => e.content).join(`
+`);
+  if (youthful && !AGE_STATED.test(`${all}
+${book}`)) {
+    warn("No ages stated", `The card has wording a model can read as young (school, campus, a uniform, petite and the like) but never says how old anyone is. Models hedge or refuse when they can't tell everyone is an adult. Give each character an age, like "22" or "a 24-year-old".`, youthful);
+  }
+  if (/\w+\(\s*"[^"]+"\s*(\+\s*"[^"]+"\s*)+\)|\[\s*\w+\s*:\s*[^\]]*;\s*\w+\s*:/.test(d.description || "")) {
+    info("W++ / bracket format", "Modern models do better with plain prose descriptions.");
+  }
+  if (d.mes_example?.trim() && !/<START>/i.test(d.mes_example))
+    info("Example messages without <START>", "Separate example blocks with <START> lines.");
+  if ((d.first_mes || "").length > 6000)
+    info("Very long first message", "Replies tend to match the first message's length.");
+  if (!tool && !modes.length)
+    info("No Codex modes picked", "Pick this card's modes (Worldhopper panel \u2192 Modes) so the Codex knows its mechanics.");
+  return out.sort((a, b) => a.level === b.level ? 0 : a.level === "warn" ? -1 : 1);
+}
 var REVIEW_SYSTEM = `You review character cards for an adult metaphysics roleplay setup. The setup's Codex (the Worldhopper Codex) already defines each mode's general mechanics; the card should state only its own specifics, and never contradict the Codex or its rules. The Codex rules: possessed hosts are simply gone unless the card says otherwise; mind control changes the mind itself, felt as the subject's own; one mind in several bodies never converses with itself and never moves in sync (it may touch itself and talk about its other bodies freely); narration never points out who is inside a body; a possession the player hasn't been told about stays invisible; characters use their powers without asking permission.
 List up to 6 concrete problems that would hurt play: contradictions with the Codex definitions or its rules, mechanics left unclear, inconsistencies between sections, greetings that break the rules, things the model is likely to get wrong. Skip anything the Codex already settles unless the card contradicts it. For each, in two or three short sentences: quote the few words at fault, say what goes wrong in play, and give the fix; every fix must itself follow the Codex rules (never one that has narration point out who is inside a body). Most serious first. If the card is fine, say so in one line. A numbered list, no preamble, no closing remarks.`;
 var REVIEW_TOOL = "This card is a card builder: a tool character that helps the author write metaphysics cards, one piece at a time. Judge it as instructions for that job (clear, consistent, and producing cards that follow the Codex), not as a roleplay character. It has no modes of its own, and its length is expected.";
@@ -4360,6 +4457,9 @@ async function personaNames() {
   } catch {
     return [];
   }
+}
+function doctor(d, { modes = [], userNames = [], alwaysTokens = null, tool = false } = {}) {
+  return doctorCard(d, { userNames, modes: [...expandModes(modes)], tool, alwaysTokens, preferCard: { system: true, postHistory: true } });
 }
 async function cardFor(chatId, characterId) {
   const c = chatId ? await loadChat(chatId) : null;
@@ -4524,7 +4624,7 @@ function push(chatId) {
       const [c, s] = await Promise.all([loadChat(chatId), settings()]);
       if (!watched.has(chatId))
         return;
-      sp.sendToFrontend(stateFor(c, s), user());
+      sp.sendToFrontend(stateFor(c, s, { presetNudge: on(s) && c?.modes?.length ? helperNotes.get(chatId) || [] : [] }), user());
     } catch (err) {
       warn("push", err);
     }
@@ -4594,6 +4694,7 @@ sp.registerInterceptor(async (messages, ctx) => {
       history: bodies ? renderHistory(bodyHistory(ledgerSnapshots(c, limit)), c.userName) : "",
       mind: mind ? renderMindBook(mind.book, c.userName, { kinds, latest: lastUserText, recent, scene }) : ""
     };
+    checkPresetHelpers(chatId, ctx.presetId, messages).catch((err) => warn("preset helpers", err));
     const out = [...messages];
     const breakdown = place(out, parts, { continuing: ctx.generationType === "continue" });
     return { messages: out, breakdown };
@@ -4602,10 +4703,42 @@ sp.registerInterceptor(async (messages, ctx) => {
     return messages;
   }
 });
+var PRESET_HELPERS = ["\u271A Metaphysics Check"];
+var helperNotes = new Map;
+var blockCache = new Map;
+async function checkPresetHelpers(chatId, presetId, messages) {
+  if (!presetId)
+    return;
+  let hit = blockCache.get(presetId);
+  if (!hit || Date.now() - hit.at > 60000) {
+    let blocks = [];
+    try {
+      blocks = await sp.presets.blocks.list(presetId, user());
+    } catch {}
+    hit = { at: Date.now(), blocks };
+    blockCache.set(presetId, hit);
+  }
+  const sent = messages.map((m) => typeof m.content === "string" ? m.content : "").join(`
+`);
+  const off = PRESET_HELPERS.filter((name) => {
+    const block = hit.blocks.find((b) => b.name === name);
+    if (!block?.content)
+      return false;
+    const line = String(block.content).split(`
+`).map((l) => l.replace(/\{\{[^}]*\}\}/g, "").trim()).find((l) => l.length > 24);
+    return !!line && !sent.includes(line.slice(0, 60));
+  });
+  const before = (helperNotes.get(chatId) || []).join("|");
+  helperNotes.set(chatId, off);
+  if (before !== off.join("|"))
+    push(chatId);
+}
 sp.on("GENERATION_ENDED", (p, uid) => {
   setUser(uid);
   if (!p?.chatId)
     return;
+  if (p.messageId && typeof p.content === "string")
+    seen(p.messageId, p.content);
   if (!p.error && p.messageId && p.generationType !== "impersonate")
     onReply(p.chatId, p.messageId);
   push(p.chatId);

@@ -3,7 +3,7 @@
 import { renderLedger, renderHistory, bodyHistory } from '../core/ledger-core.js';
 import { renderMindBook } from '../core/mind-core.js';
 import { personaText, personaKey } from '../core/persona-core.js';
-import { sp, setUser, user, log, warn, settings, saveSettings, on, loadChat, setPicks, target, copyChatState, forgetCharacter, calls } from './host.js';
+import { sp, setUser, user, log, warn, settings, saveSettings, on, loadChat, setPicks, target, copyChatState, forgetCharacter, calls, seen } from './host.js';
 import { codexParts, place, fillMacros } from './inject.js';
 import * as E from './engine.js';
 import * as A from './actions.js';
@@ -34,7 +34,7 @@ function push(chatId) {
         try {
             const [c, s] = await Promise.all([loadChat(chatId), settings()]);
             if (!watched.has(chatId)) return;
-            sp.sendToFrontend(stateFor(c, s), user());
+            sp.sendToFrontend(stateFor(c, s, { presetNudge: on(s) && c?.modes?.length ? helperNotes.get(chatId) || [] : [] }), user());
         } catch (err) { warn('push', err); }
     }, 60));
 }
@@ -92,6 +92,7 @@ sp.registerInterceptor(async (messages, ctx) => {
             history: bodies ? renderHistory(bodyHistory(E.ledgerSnapshots(c, limit)), c.userName) : '',
             mind: mind ? renderMindBook(mind.book, c.userName, { kinds, latest: lastUserText, recent, scene }) : '',
         };
+        checkPresetHelpers(chatId, ctx.presetId, messages).catch(err => warn('preset helpers', err));
         const out = [...messages];
         const breakdown = place(out, parts, { continuing: ctx.generationType === 'continue' });
         return { messages: out, breakdown };
@@ -101,11 +102,42 @@ sp.registerInterceptor(async (messages, ctx) => {
     }
 });
 
+// The Worldhopper presets' optional metaphysics block (a bodies-and-minds step in their reasoning check). When a chat
+// has modes and the preset's block didn't make it into the prompt (switched off in whatever profile is in use), the
+// panel says so. Lumiverse decides a block's state from several profiles (chat, persona, character, connection), so
+// the finished prompt is the one place to see it.
+const PRESET_HELPERS = ['✚ Metaphysics Check'];
+const helperNotes = new Map();   // chatId → names of helper blocks that are in the preset but weren't sent
+const blockCache = new Map();    // presetId → { at, blocks }
+async function checkPresetHelpers(chatId, presetId, messages) {
+    if (!presetId) return;
+    let hit = blockCache.get(presetId);
+    if (!hit || Date.now() - hit.at > 60000) {
+        let blocks = [];
+        try { blocks = await sp.presets.blocks.list(presetId, user()); } catch { /* no access: say nothing */ }
+        hit = { at: Date.now(), blocks };
+        blockCache.set(presetId, hit);
+    }
+    const sent = messages.map(m => (typeof m.content === 'string' ? m.content : '')).join('\n');
+    const off = PRESET_HELPERS.filter(name => {
+        const block = hit.blocks.find(b => b.name === name);
+        if (!block?.content) return false;
+        // A stretch of the block's own words with no macros in it.
+        const line = String(block.content).split('\n').map(l => l.replace(/\{\{[^}]*\}\}/g, '').trim()).find(l => l.length > 24);
+        return !!line && !sent.includes(line.slice(0, 60));
+    });
+    const before = (helperNotes.get(chatId) || []).join('|');
+    helperNotes.set(chatId, off);
+    if (before !== off.join('|')) push(chatId);
+}
+
 // ------------------------------------------------------------------ events
 
 sp.on('GENERATION_ENDED', (p, uid) => {
     setUser(uid);
     if (!p?.chatId) return;
+    // The reply as it came: Lumiverse's own follow-up writes to it (token counts, reasoning) aren't edits.
+    if (p.messageId && typeof p.content === 'string') seen(p.messageId, p.content);
     if (!p.error && p.messageId && p.generationType !== 'impersonate') E.onReply(p.chatId, p.messageId);
     push(p.chatId);
 });

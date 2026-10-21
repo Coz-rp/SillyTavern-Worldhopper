@@ -40,6 +40,11 @@ async function personaNames() {
 
 // ------------------------------------------------------------------ Check card
 
+/** The Card Doctor's findings for a card's data with these modes. */
+function doctor(d, { modes = [], userNames = [], alwaysTokens = null, tool = false } = {}) {
+    return doctorCard(d, { userNames, modes: [...expandModes(modes)], tool, alwaysTokens, preferCard: { system: true, postHistory: true } });
+}
+
 /** The character to check: the one asked for (the character editor), else the open chat's. */
 async function cardFor(chatId, characterId) {
     const c = chatId ? await loadChat(chatId) : null;
