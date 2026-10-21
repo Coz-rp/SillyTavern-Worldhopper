@@ -2,6 +2,7 @@
 // the current color). Named after the Font Awesome icons the SillyTavern Engine used, so the views read the same.
 const P = {
     'user': '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    'person': '<circle cx="12" cy="4.5" r="2"/><path d="M12 9v5M7 10.5l5-1.5 5 1.5M9 21l3-7 3 7"/>',
     'user-group': '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8"/><path d="M22 21a6 6 0 0 0-4-5.6"/>',
     'user-slash': '<circle cx="10" cy="8" r="4"/><path d="M2 21a8 8 0 0 1 13-6.2"/><path d="m17 17 5 5M22 17l-5 5"/>',
     'user-check': '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="m16 11 2 2 4-4"/>',
