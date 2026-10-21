@@ -2,10 +2,13 @@
 // (The WH Editor, a separate extension, keeps its own copies in its editor-core.js.)
 
 const LIST_LINE = /^\s*(?:[-•#>|]|\d+[.)]\s|\*\*[^*]+\*\*\s*:|\[[A-Z]\])|\*\*[^*]{1,40}:\*\*/;
+// Lines that are neither prose nor notes: a horizontal rule, and the Worldhopper presets' scene anchor
+// ("## **[📍 place · 🕰️ time …]**"). Counted as list lines, they made a short reply under an anchor read as notes.
+const NEUTRAL_LINE = /^(?:[-*_]\s*){3,}$|^#{0,4}\s*\**\s*\[?\s*📍/u;
 
 /** True when a reply reads as roleplay prose rather than notes, a card spec, or other out-of-story work. */
 export function looksLikeRoleplay(text) {
-    const lines = String(text).split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = String(text).split('\n').map(l => l.trim()).filter(l => l && !NEUTRAL_LINE.test(l));
     if (!lines.length) return false;
     const listy = lines.filter(l => LIST_LINE.test(l) || /^#{1,6}\s/.test(l)).length;
     return listy / lines.length < 0.3;

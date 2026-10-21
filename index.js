@@ -1442,7 +1442,8 @@ function renderStrip() {
         const tip = [b.how, b.host ? `own mind: ${b.host}` : '', aka.length ? `also ${aka.join(', ')}` : '', b.user_knows === 'no' ? 'hidden from you' : ''].filter(Boolean).join(' · ');
         return chip(kind, icon, title, sub, tip, b.user_knows === 'no', faceFor(title).image);
     });
-    $('#wh_ledger_strip').html(`${chips.join('')}${ledgerBusy ? '<span class="wh-busy">updating…</span>' : ''}`).show();
+    // The Ledger's own icon at the front (as in its panel heading), as the Mind Book's bar has a brain, so the two read as a pair.
+    $('#wh_ledger_strip').html(`<span class="wh-strip-label" title="Body Ledger"><i class="fa-solid fa-people-arrows"></i></span>${chips.join('')}${ledgerBusy ? '<span class="wh-busy">updating…</span>' : ''}`).show();
     renderLanes();
 }
 
