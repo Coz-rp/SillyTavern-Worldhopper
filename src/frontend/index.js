@@ -373,8 +373,8 @@ function renderDocks() {
     const bar = (cls, title, html, open) => $(`<div class="wh-ledger-strip ${cls}" role="button" tabindex="0"></div>`).attr('title', title).html(html)
         .on('click keydown', e => { if (e.type === 'click' || e.key === 'Enter') open(); });
     const wrap = $('<div class="wh-ui wh-docks"></div>');
-    // Each bar leads with what it is: a body for the Ledger, a brain for the Mind Book.
-    if (st.strip?.show) wrap.append(bar('', 'Body Ledger — tap to open', `<span class="wh-strip-label" title="Body Ledger">${svg('person')}</span>${st.strip.chips.map(chipHtml).join('')}${st.strip.busy ? '<span class="wh-busy">updating…</span>' : ''}`, openLedgerView));
+    // Each bar leads with what it is: the Ledger's swap arrows (as in its panel heading), the Mind Book's brain.
+    if (st.strip?.show) wrap.append(bar('', 'Body Ledger — tap to open', `<span class="wh-strip-label" title="Body Ledger">${svg('people-arrows')}</span>${st.strip.chips.map(chipHtml).join('')}${st.strip.busy ? '<span class="wh-busy">updating…</span>' : ''}`, openLedgerView));
     if (st.mindStrip?.show) wrap.append(bar('wh-mind-strip', 'Mind Book — tap to open', `<span class="wh-strip-label" title="Mind Book">${svg('brain')}</span>${st.mindStrip.chips.map(chipHtml).join('')}${st.mindStrip.busy ? '<span class="wh-busy">updating…</span>' : ''}`, openMindView));
     if (wrap.children().length) box.append(wrap);
 }
