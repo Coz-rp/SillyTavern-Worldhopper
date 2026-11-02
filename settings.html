@@ -8,6 +8,11 @@
         <div class="inline-drawer-content wh-body">
             <div id="wh_off_note" class="wh-tip wh-off-note" style="display:none"><i class="fa-solid fa-power-off"></i><span><b>Worldhopper is off.</b> Nothing goes into your prompts and no background model runs. Moment boxes, "As …" badges and ⟲ on edited replies still show, and your modes and Ledgers are kept for when you turn it back on.</span></div>
 
+            <!-- Stage mode: a look for all of SillyTavern, so it has a row of its own up here instead of under Settings. -->
+            <section class="wh-card wh-stage-card">
+                <label class="wh-switch wh-stage-switch" for="wh_stage_on"><input type="checkbox" id="wh_stage_on"><span><b><i class="fa-solid fa-masks-theater"></i> Stage mode</b><small>Worldhopper's own look for all of SillyTavern, in your theme's colors, with or without Moonlit Echoes. In a story with bodies, the strip above the chat becomes a band you pull down for the Board: everyone by place, a rider's face on the body they're in. Drag your own body to go somewhere; drag anyone else to correct where they are. It's in the wand menu too, and it says what it changes before it turns on.</small></span></label>
+            </section>
+
             <!-- What you look at: this chat's modes and bodies. Everything set-and-forget lives under Settings. -->
             <section class="wh-card">
                 <div class="wh-head">
@@ -15,12 +20,13 @@
                     <div class="wh-tools">
                         <i class="wh-help-toggle fa-solid fa-circle-question" data-help="modes" title="How modes work" tabindex="0"></i>
                         <div id="wh_codex_suggest_now" class="menu_button menu_button_icon fa-solid fa-wand-magic-sparkles" title="Suggest modes from this character's card"></div>
+                        <div id="wh_codex_rules" class="menu_button menu_button_icon fa-solid fa-sliders" title="Card rules: how this character's power works"></div>
                         <div id="wh_codex_edit" class="menu_button menu_button_icon fa-solid fa-pen" title="Change this character's modes"></div>
                     </div>
                 </div>
                 <div class="wh-help" data-help="modes">
                     Pick the kinds of metaphysics this character uses (possession, mind control, dolls…). Worldhopper then adds the matching Codex rules to every reply in this chat, so the model knows how they work. Every mode is opt-in: nothing you didn't pick ever shows up. Picks are saved per character or group.
-                    <br><i class="fa-solid fa-pen"></i> changes the picks · <i class="fa-solid fa-wand-magic-sparkles"></i> suggests some from the card · tap a picked mode to see what it means.
+                    <br><i class="fa-solid fa-pen"></i> changes the picks · <i class="fa-solid fa-wand-magic-sparkles"></i> suggests some from the card · <i class="fa-solid fa-sliders"></i> sets how this card's power works where it differs from the Codex (whether the host sleeps or is gone, what they remember afterward…), saved in the card itself · tap a picked mode to see what it means.
                 </div>
                 <div id="wh_codex_picked" class="wh-picked"></div>
                 <div id="wh_codex_suggestion" class="wh-suggestion" style="display:none">
@@ -44,9 +50,9 @@
                     </div>
                 </div>
                 <div class="wh-help" data-help="ledger">
-                    Keeps track of who is in which body (possession, multipossession, skinsuits, hive minds, copies, swaps) and who has which power. It updates after each reply in chats with one of those modes, and goes into the prompt so names, pronouns and every change stay straight. Each body someone takes over gets three short lines on who its owner is in their own life (look, voice and habits, life), written once by your notes model, so the people around it keep treating it as who it was, and the owner is themselves again once released. <span class="wh-key wh-key-you"></span> teal rows are yours; <span class="wh-key wh-key-npc"></span> violet rows are someone else's. Mind changes like hypnosis and mind control belong to the Mind Book, so the Ledger only comes in with a body mode, and it shows here only then.
+                    Keeps track of who is in which body (possession, multipossession, skinsuits, hive minds, copies, swaps) and who has which power. It updates after each reply in chats with one of those modes, and goes into the prompt so names, pronouns and every change stay straight. Each body someone takes over gets three short lines on who its owner is in their own life (look, voice and habits, life), written once by your notes model, so the people around it keep treating it as who it was, and the owner is themselves again once released. Beside it, the World notes keep the story's day and time and the deadlines coming up, where each body is and what it has on, the things that matter, and who knows what; the writer gets them for the people in the scene and for every body of yours. <span class="wh-key wh-key-you"></span> teal rows are yours; <span class="wh-key wh-key-npc"></span> violet rows are someone else's. Mind changes like hypnosis and mind control belong to the Mind Book, so the Ledger only comes in with a body mode, and it shows here only then.
                     After each reply it reads only the newest messages, never the whole chat.
-                    While you run more than one body, a card per body sits over the message box: tap one to start a line like <code>[Kayla] </code> for that body. A line with no name is you as a whole, and the writer only ever does what you wrote with your bodies.
+                    While you run more than one body, the message box gets a tab per body, plus All: the box writes for the open tab, each tab keeps its own line, a dot marks the ones with something in them, and Send sends them all (Alt+Left/Right switch tabs). An empty tab means that body does nothing new. All is for lines that aren't for one body in particular, and typing <code>[Kayla] </code> at the start of a line still works too. The writer only ever does what you wrote with your bodies.
                     <br><i class="fa-solid fa-pen"></i> (or the bar above the chat) opens it as cards: tap ✏️ by any part of a card to change it (the next update builds on your fix), and tap a face for its picture · <i class="fa-solid fa-rotate"></i> rebuilds it from the card and the last few messages · tap a row here to see its details.
                 </div>
                 <div id="wh_ledger_summary" class="wh-box"></div>
@@ -61,7 +67,7 @@
                     </div>
                 </div>
                 <div class="wh-help" data-help="mind">
-                    Keeps what Hypnosis, Mind Control and Altered Perception have put into people, each in its own record: a hypnotized person's trance stage, sessions, suggestions and triggers; what a controller has set in someone's will; who can't perceive what. It updates only on replies that touch those things, and goes into the prompt with a line for the moment when it matters: a trigger word just said, a controlled person in the scene, someone who can't see a person who is right there.
+                    Keeps what Hypnosis, Mind Control and Altered Perception have put into people, each in its own record: a hypnotized person's trance stage, sessions, suggestions and triggers; what a controller has set in someone's will; who can't perceive what. When a card's rules say change builds (Card rules → Change that builds), it also keeps each change that builds a little at a time, whatever the card's modes: who, what it changes, and how many times it's been done, counted by the Engine, so the writer knows whether it's a fresh nudge, taking hold, or holding on its own. It updates only on replies that touch those things, and goes into the prompt with a line for the moment when it matters: a trigger word just said, a controlled person in the scene, someone who can't see a person who is right there.
                     <br><i class="fa-solid fa-pen"></i> (or the bar above the chat) opens it as cards: tap ✏️ by any part of a card to change it, or + to add someone (the next update builds on your fix) · tap a row here to see its details.
                 </div>
                 <div id="wh_mind_summary" class="wh-box"></div>
@@ -83,16 +89,15 @@
                     <section class="wh-section">
                         <div class="wh-group"><i class="fa-solid fa-microchip"></i><span>Models</span> <i class="wh-help-toggle fa-solid fa-circle-question" data-help="models" title="Which model does what" tabindex="0"></i></div>
                         <div class="wh-help" data-help="models">
-                            Worldhopper's background jobs run through your connection profiles (plug menu → Connection Profile), separate from the model you chat with. Give them their own model: a local one (KoboldCpp, Ollama…) or a cheap, fast API model (the Flash, Haiku or mini tier). The jobs are small and the Ledger runs after every reply, so that keeps things quick and costs next to nothing; your big roleplay model would work, but at big-model prices on every reply, and your next reply waits for the Ledger. A job with no model picked simply doesn't run.
+                            Use a local or budget model here, not your roleplay model: these jobs run after every reply. Worldhopper's background jobs run through your connection profiles (plug menu → Connection Profile), separate from the model you chat with. Give them their own model: a local one (KoboldCpp, Ollama…) or a cheap, fast API model (the Flash, Haiku or mini tier). The jobs are small and the Ledger runs after every reply, so that keeps things quick and costs next to nothing; your big roleplay model would work, but at big-model prices on every reply, and your next reply waits for the Ledger. A job with no model picked simply doesn't run.
                         </div>
-                        <div class="wh-tip"><i class="fa-solid fa-bolt"></i><span><b>Fast and cheap:</b> use a local or budget model here, not your roleplay model.</span></div>
                         <div id="wh_no_profiles" class="wh-warning" style="display:none">No connection profiles yet. Save one in the plug menu (Connection Profile), then pick it here.</div>
                         <label class="wh-field wh-stack">
                             <span><b>Ledger &amp; suggestions</b><small>Updates the Body Ledger and the Mind Book after replies, checks replies against the Ledger, and suggests modes for new characters. Runs the most, so pick your fastest, cheapest model.</small></span>
                             <select id="wh_ledger_profile" class="text_pole"></select>
                         </label>
                         <label class="wh-field wh-stack">
-                            <span><b>Notes &amp; reviews</b><small>Writes Body History notes, host sheets and the looks pictures are drawn from, and runs Check card's deeper review. Runs rarely; a cheap model works, and a slightly better one reads a little closer.</small></span>
+                            <span><b>Notes &amp; reviews</b><small>Writes Body History notes, host sheets and the looks pictures are drawn from, runs Check card's deeper review and the openings and checks for Test this card. Runs rarely; a cheap model works, and a slightly better one reads a little closer.</small></span>
                             <select id="wh_ledger_notes_profile" class="text_pole"></select>
                         </label>
                     </section>
@@ -103,9 +108,14 @@
                             The few things that are up to you. Everything else (the mode reminders, detail entries, the strip, the body roster, Body History, the pronoun and body-rule checks) is part of Worldhopper and runs whenever it's on. To turn all of it off at once, use the switch in the Worldhopper Engine heading.
                         </div>
                         <div class="wh-switches">
-                            <label class="wh-switch" for="wh_ledger_enabled"><input type="checkbox" id="wh_ledger_enabled"><span><b>Body Ledger &amp; Mind Book</b><small>Track who is in which body, and what hypnosis, mind control and altered perception have put into people, after each reply in chats with those modes. Off, the mode rules still apply, but nothing runs in the background and your send never waits.</small></span></label>
+                            <label class="wh-switch" for="wh_ledger_enabled"><input type="checkbox" id="wh_ledger_enabled"><span><b>Body Ledger &amp; Mind Book</b><small>Track who is in which body, and what hypnosis, mind control, altered perception and change over time have put into people, after each reply in chats with those modes. Off, the mode rules still apply, but nothing runs in the background and your send never waits.</small></span></label>
                             <label class="wh-switch" for="wh_pictures_auto"><input type="checkbox" id="wh_pictures_auto"><span><b>Draw pictures on their own</b><small>Draws each new host once their sheet is written, and each new person in the Mind Book, through SillyTavern's Image Generation. Off, tap anyone's face in the Ledger or the Mind Book to draw them whenever you like.</small></span></label>
                         </div>
+                        <label class="wh-field wh-stack" for="wh_you_pronouns">
+                            <span><b>Your pronouns</b><small id="wh_you_for">For the persona you're using.</small></span>
+                            <input id="wh_you_pronouns" class="text_pole" list="wh_you_pronoun_list" placeholder="he/him, she/her, they/them…">
+                            <datalist id="wh_you_pronoun_list"><option value="he/him"></option><option value="she/her"></option><option value="they/them"></option></datalist>
+                        </label>
                         <div id="wh_pictures_box" class="wh-field wh-stack">
                             <span><b>Pictures</b><small id="wh_pictures_source">Drawn by Image Generation as you've set it up.</small><small>The look (anime, painted, photo) comes from your model, or from a Style: save one in Image Generation with the look's words in its prefix, then pick it here.</small></span>
                             <div class="wh-pic-grid">

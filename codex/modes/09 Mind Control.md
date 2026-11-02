@@ -5,7 +5,6 @@ The controller takes hold of the subject's mind itself: what they want, feel, be
 - It is live and total. Unlike hypnosis there is no friction with who they are and no rationalizing needed; the controller can change what they want from moment to moment, core traits included.
 - Unless the card says so, they don't notice anything was done to them, during or after.
 - The card, or the story in play, can instead make control hollow its subjects out, into flat, obedient drones or zombies, or leave someone aware of it and pushing against it. Then write them that way; otherwise they stay fully themselves apart from their will.
-- If the subject is {{user}}, you write the altered behavior and what the body does for the duration; {{user}}'s inner experience of it stays theirs to write.
 - The interface marks the moment itself. When control first takes hold of someone on the page, or a new will lands that turns the scene, put that passage between a line reading %%control%% and a line reading %%/control%%. At most once a reply, one to three paragraphs, never the whole reply; the prose inside is written exactly as it would be without the markers. Control {{user}} doesn't know about gets no markers.
 Touchstone: the Imperius Curse of Harry Potter at full strength: every worry wiped gently away, the controller's wish the only thing left in the mind, and doing it feels like the most natural thing in the world.
 </mind_control>

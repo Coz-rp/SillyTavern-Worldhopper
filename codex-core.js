@@ -17,7 +17,12 @@ const OCCUPANCY_BASE = ['Possession', 'Propagation', 'Puppetry', 'Skinsuit', 'Hi
 
 // Each anchor comes in with its mode, or with any of a list of modes.
 export const ANCHOR_FOR = {
+    // Taking a body never costs the multipossessor their own: needed the moment they take one, so it comes with the pick.
     '⛓ Multi Anchor': 'Multipossession',
+    // One mind in several bodies (no conversing, no sync, the player's bodies do only what they wrote).
+    '⛓ Several Bodies Anchor': ['Multipossession', 'Hive Mind'],
+    // "Powers get used this turn" would rush a trance: hypnosis builds at its own pace.
+    '⛓ Pace Anchor': 'Hypnosis',
     '⛓ Propagation Anchor': 'Propagation',
     '⛓ Puppetry Anchor': 'Puppetry',
     '⛓ Skinsuit Anchor': 'Skinsuit',
@@ -30,6 +35,57 @@ export const ANCHOR_FOR = {
 };
 
 export const ALL_MODES = MODE_GROUPS.flatMap(([, modes]) => modes);
+
+// ------------------------------------------------------------------ what's actually happening
+// With the Body Ledger and the Mind Book running, the Engine knows what is going on in the chat right now:
+//   state = { bodies: { ridden, several, copy, puppet, worn, swap } | null, minds: { hypnosis, control, perception } | null }
+// null means that side isn't tracked in this chat (no Ledger, or no Mind Book), and then everything arms by the picks
+// alone, as it always has. Reminders about one kind of body, and details about one situation, wait for that to exist.
+const known = (state, side, key) => !state || !state[side] || !!state[side][key];
+
+/**
+ * Reminders that wait for their kind of body. None, on purpose: tested on a long test card (2026-10-28), holding the skinsuit,
+ * copy, puppet and several-bodies reminders until the Ledger showed such a body left the first takeover without them,
+ * the moment they matter most, and replies started calling the player "she" in a taken body (0 breaks before, 6 after).
+ */
+export const ANCHOR_STATE = {};
+
+/**
+ * Details about an ongoing situation that fired on everyday words ("mom", "remember", "deeper") come in only once the
+ * situation exists, or when a word nobody uses by accident is in the latest messages (strong). Details about the moment
+ * itself (taking a body, putting on a suit, absorption, control taking hold) keep their topic words alone: the moment
+ * happens before the Ledger or the Mind Book can know about it.
+ */
+export const DETAIL_GATES = {
+    '📖 Possession · memory and skills': { when: s => known(s, 'bodies', 'ridden') },
+    '📖 Possession · people who know the host': { when: s => known(s, 'bodies', 'ridden') },
+    '📖 Possession · living in someone else\'s body': { when: s => known(s, 'bodies', 'ridden') },
+    '📖 Propagation · copies and the original': { when: s => known(s, 'bodies', 'copy'), strong: /\b(?:clone|duplicat)\w*/i },
+    '📖 Body Swap · living as each other': { when: s => known(s, 'bodies', 'swap'), strong: /\bswap\w*/i },
+    '📖 Hypnosis · trance depth and triggers': { when: s => known(s, 'minds', 'hypnosis'), strong: /\b(?:trance|hypno\w*|pendulum|induction)\b/i },
+    '📖 Hypnosis · resistance': { when: s => known(s, 'minds', 'hypnosis') },
+    '📖 Altered Perception · living around the edit': { when: s => known(s, 'minds', 'perception') },
+};
+
+// ------------------------------------------------------------------ when modes meet
+// A combination note covers what happens when two modes meet. It is switched on only when every mode it needs is
+// picked for this chat (all, plus at least one of any, or at least two of twoOf), and never by anything else, so a
+// card with one mode, or with modes that don't meet, never gets one.
+export const COMBOS = {
+    '🔗 Possession with mind powers': { all: ['Possession'], any: ['Hypnosis', 'Mind Control', 'Altered Perception'] },
+    '🔗 One body, one occupant': { all: ['Possession'], any: ['Skinsuit', 'Hive Mind', 'Propagation', 'Body Swap'] },
+    '🔗 Drones and the hive': { all: ['Dronification', 'Hive Mind'] },
+    '🔗 Control that hollows someone out': { all: ['Mind Control'], any: ['Dronification', 'Blank Slate'] },
+    '🔗 One state at a time': { twoOf: ['Dollification', 'Dronification', 'Blank Slate', 'Pet Play', 'Limp Play'] },
+    '🔗 Souls and taken bodies': { all: ['Soul Play'], any: ['Possession', 'Skinsuit', 'Hive Mind', 'Puppetry', 'Body Swap'] },
+    '🔗 Timestop with several bodies': { all: ['Timestop'], any: ['Multipossession', 'Hive Mind', 'Puppetry'] },
+    '🔗 Reverse Vore with several bodies': { all: ['Reverse Vore', 'Multipossession'] },
+};
+export function comboArmed(title, active) {
+    const c = COMBOS[String(title || '').trim()];
+    if (!c) return false;
+    return (c.all || []).every(m => active.has(m)) && (!c.any || c.any.some(m => active.has(m))) && (!c.twoOf || c.twoOf.filter(m => active.has(m)).length >= 2);
+}
 
 // The Metaphysics Core comes with every mode; its two other parts only where they apply, so a mind-only chat (Hypnosis,
 // say) isn't paying for rules about bodies: the body rules wherever a mind drives a body that isn't its own (every
@@ -96,7 +152,7 @@ export function expandModes(picked) {
  * @returns {'constant'|'keyed'|null} constant = inject unconditionally; keyed = allow its own keys to trigger it;
  *          null = leave it off.
  */
-export function planEntry(title, active, { anchors = true, details = true } = {}) {
+export function planEntry(title, active, { anchors = true, details = true, state = null, recent = '' } = {}) {
     if (!active.size) return null;
     const t = String(title || '').trim();
     if (t === '👁 Metaphysics Core') return 'constant';
@@ -104,10 +160,12 @@ export function planEntry(title, active, { anchors = true, details = true } = {}
     // Characters with a power use it: part of every mode, not a choice.
     if (t === '⛓ Initiative Anchor') return 'constant';
     if (t.startsWith('👁 ')) return active.has(t.slice(2).trim()) ? 'constant' : null;
-    if (t.startsWith('⛓ ')) return anchors && [ANCHOR_FOR[t]].flat().some(m => active.has(m)) ? 'constant' : null;
+    if (t.startsWith('🔗 ')) return comboArmed(t, active) ? 'constant' : null;
+    if (t.startsWith('⛓ ')) return anchors && [ANCHOR_FOR[t]].flat().some(m => active.has(m)) && (!ANCHOR_STATE[t] || ANCHOR_STATE[t](state)) ? 'constant' : null;
     if (t.startsWith('📖 ')) {
         const mode = t.slice(2).split(' · ')[0].trim();
-        return details && active.has(mode) ? 'keyed' : null;
+        const gate = DETAIL_GATES[t];
+        return details && active.has(mode) && (!gate || gate.when(state) || !!gate.strong?.test(recent)) ? 'keyed' : null;
     }
     return null;
 }
@@ -121,6 +179,8 @@ export const DISPLAY_SCRIPTS = [
     { id: 'wh-possession-box', scriptName: 'WH - Possession', findRegex: '/%%possession%%[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*%%\\/possession%%/gi', replaceString: '<div class="wh-possess" markdown="1">\n$1\n</div>' },
     { id: 'wh-release-box', scriptName: 'WH - Release', findRegex: '/%%release%%[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*%%\\/release%%/gi', replaceString: '<div class="wh-release" markdown="1">\n$1\n</div>' },
     { id: 'wh-moments', scriptName: 'WH - Moments', findRegex: `/%%(${MOMENTS.join('|')})%%[ \\t]*\\n?([\\s\\S]*?)\\n?[ \\t]*%%\\/\\1%%/gi`, replaceString: '<div class="wh-moment wh-m-$1" markdown="1">\n$2\n</div>' },
+    // A scene's place, when the player's bodies are in different places and the reply comes as one scene per place.
+    { id: 'wh-place', scriptName: 'WH - Place', findRegex: '/^[ \\t]*%%place:[ \\t]*([^%\\n]{1,80}?)[ \\t]*%%[ \\t]*$/gim', replaceString: '<div class="wh-place">$1</div>' },
     // A marker whose partner went missing would otherwise show as raw text. Must run after the box scripts.
     { id: 'wh-stray-markers', scriptName: 'WH - Stray markers', findRegex: `/^[ \\t]*%%\\/?(?:possession|release|${MOMENTS.join('|')})%%[ \\t]*\\n?/gim`, replaceString: '' },
     // Your lines for one body ("[Kayla] takes the keys", from the body buttons) as labeled rows; your messages only.

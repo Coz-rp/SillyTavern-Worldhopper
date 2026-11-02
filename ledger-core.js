@@ -149,10 +149,10 @@ Fields for each body:
 - driver: the name of the mind currently driving it, or "" if nobody is driving it (an empty body)
 - driver_pronouns: the DRIVING MIND's own pronouns, e.g. "he/him"
 - how: the mechanism in a word or two: possession, multipossession, skinsuit, hive mind, copy, swap. A body overwritten by a copy has the original's name as driver and how "copy"
-- host: only what the messages actually show about the body's own mind, e.g. "gone" or "dead". If they don't show it, leave it "". Never guess, and never assume the host is awake or aware.
+- host: where the body's own mind is and what has become of it, in a few words, only as the messages or the card actually show it. Be specific, never a bare "gone" or "out": say whether it is erased for good, pushed out for now (and where it is: "pushed out, drifting nearby", "in Sam's old body"), switched off until the rider leaves, asleep inside, or awake inside and powerless. If they don't show it, leave it "". Never guess, and never assume the host is awake or aware.
 - notes: a short phrase: what the body is wearing and where it is. Lasting facts only, never a momentary action ("holding a cup", "laughing")
 - doing: what the body is busy with right now, an ongoing activity in a few words ("calc homework", "driving to work", "asleep"), or "" if nothing in particular. Keep it current: when the messages show the body moving on to something else, change it
-- user_knows: "yes" if {{user}} is the driver, has been told, has seen it happen, or the card or opening establishes that {{user}} knows; "no" if it is being kept from {{user}}. Once "yes", it stays "yes".
+- user_knows: "yes" if {{user}} is the driver, has been told about this takeover, has seen it happen, or the card or opening establishes that {{user}} knows about it; "no" if it is being kept from {{user}}, or happened where {{user}} wasn't and nobody has told them. Knowing that someone has a power is not knowing each time they use it. Once "yes", it stays "yes".
 
 Aliases: anyone the story calls by more than one name (a code name or unit number, a handle, a host number, a nickname, a real name behind a persona) is listed once with every name, e.g. {"name":"Sasha","aka":["Unit 114"]}. In body and driver fields, use the name the story uses most.
 
@@ -195,12 +195,14 @@ const clip = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n
  * @param {boolean} [p.update]   answer with only the changes (every update after the first build)
  * @param {{name:string, text:string}[]} [p.context]  the exchange before the new messages, already reflected in the
  *                               ledger: it tells the model who "you" is and who was where, so a mention isn't misread
+ * @param {string[]} [p.rules]   the card's rules that bear on the ledger (rules-core compileRules().ledger), every update
  */
-export function buildLedgerMessages({ ledger, messages, userName, modes = [], card = '', persona = '', update = false, context = [] }) {
+export function buildLedgerMessages({ ledger, messages, userName, userPronouns = '', modes = [], card = '', persona = '', update = false, context = [], rules = [] }) {
     const sys = (update ? LEDGER_UPDATE_SYSTEM : LEDGER_SYSTEM).replaceAll('{{user}}', userName || 'the player');
     const parts = [];
     if (card) parts.push(`Character card (background only; the chat decides the current state):\n${clip(card, 3000)}`);
     if (persona) parts.push(`${userName}'s persona:\n${clip(persona, 800)}`);
+    if (userPronouns) parts.push(`${userName} (the player) goes by ${userPronouns}: the driver_pronouns of any body ${userName} drives.`);
     if (modes.length) parts.push(`Mechanics this story can use (possible, not necessarily happening): ${modes.join(', ')}.`);
     const keepsOwn = modes.filter(m => KEEPS_OWN_BODY.includes(m));
     if (keepsOwn.length) parts.push(`With ${list(keepsOwn)}, one mind runs several bodies at once, and taking a new body adds it: the mind keeps every body it already had, its own included, unless the messages show it leaving one. Its own body stays off the body list while it still drives it (it gets an "own" entry instead); never list it as empty just because the mind took someone else, and never take a row off because the scene is following its own body or another of its bodies. Such a ride's how is ${keepsOwn.map(m => `"${lc(m)}"`).join(' or ')}, whichever the story shows.`);
@@ -210,6 +212,7 @@ export function buildLedgerMessages({ ledger, messages, userName, modes = [], ca
     // In a swap each body keeps its own name and home while the other mind drives it, so "Ben at Ben's house" is still
     // Ana inside; the one-body rule above would read that as Ben back home.
     if (modes.includes('Body Swap')) parts.push('With Body Swap, two minds trade bodies: each swapped body is driven by the other\'s mind (how "swap"), and the story keeps calling each body by its own name, in its own home and life. So a swapped body seen under its own name is still swapped; the swap ends, for both rows, only when the messages show it undone.');
+    if (rules.length) parts.push(`The card's own rules, which always hold in this story:\n${rules.map(r => `- ${r}`).join('\n')}`);
     parts.push(`Current ledger:\n${JSON.stringify(normalizeLedger(ledger || EMPTY_LEDGER))}`);
     if (context.length) parts.push('Earlier messages, for context only (the ledger already reflects them):\n' + context.map(m => `### ${m.name}\n${clip(m.text, 1500)}`).join('\n\n'));
     parts.push((context.length ? 'New messages to apply' : 'Newest messages') + ', oldest first:\n' + messages.map(m => `### ${m.name}\n${clip(m.text, 2500)}`).join('\n\n'));
@@ -224,17 +227,22 @@ export function buildLedgerMessages({ ledger, messages, userName, modes = [], ca
 function firstJson(text, open = '{') {
     const s = String(text || '');
     const close = open === '[' ? ']' : '}';
+    // An answer cut off partway (a model that thinks first can spend the limit) has an object that never closes: it's
+    // unreadable, so the caller asks again with room, rather than taking a complete piece from inside it as the answer
+    // (a cut-off World update was read as its first thing and saved as empty notes, 2026-10-28).
     for (let a = s.indexOf(open); a >= 0; a = s.indexOf(open, a + 1)) {
-        let depth = 0, inStr = false;
+        let depth = 0, inStr = false, closed = false;
         for (let i = a; i < s.length; i++) {
             const c = s[i];
             if (inStr) { if (c === '\\') i++; else if (c === '"') inStr = false; continue; }
             if (c === '"') inStr = true;
             else if (c === open) depth++;
             else if (c === close && --depth === 0) {
+                closed = true;
                 try { return JSON.parse(s.slice(a, i + 1)); } catch { break; }
             }
         }
+        if (!closed) return null;
     }
     return null;
 }
@@ -247,6 +255,8 @@ export function parseLedger(text) {
 }
 
 const FIELDS = ['body', 'pronouns', 'driver', 'driver_pronouns', 'how', 'host', 'notes', 'doing', 'user_knows'];
+// On a row already in the ledger, an empty string in these is the update template echoed back, never a change.
+const KEEP_WHEN_EMPTY = new Set(['body', 'pronouns', 'driver', 'driver_pronouns', 'how', 'user_knows']);
 const listOf = v => (Array.isArray(v) ? v : v == null ? [] : [v]);
 
 /**
@@ -279,6 +289,9 @@ export function applyLedgerDiff(ledger, diff) {
         for (const f of FIELDS) {
             if (r[f] === undefined || r[f] === null) continue;
             if (f === 'user_knows' && bodies[i].user_knows === 'yes') continue;
+            // It would wipe stored pronouns, the driver or the kind of ride. Notes, what the body is doing and the
+            // host's state can still be cleared on purpose.
+            if (KEEP_WHEN_EMPTY.has(f) && !str(r[f])) continue;
             merged[f] = r[f];
         }
         bodies[i] = merged;
@@ -318,6 +331,8 @@ export function applyLedgerDiff(ledger, diff) {
 export function parseLedgerUpdate(text, current) {
     const j = firstJson(text);
     if (!j) return /^\s*(\{\s*\}|none|no changes?\.?)\s*$/i.test(String(text || '')) ? normalizeLedger(current) : null;
+    // Something with none of an update's parts isn't an update (a piece of one, or the wrong shape): unreadable.
+    if (!Array.isArray(j) && Object.keys(j).length && !['set', 'add', 'update', 'changed', 'bodies', 'remove', 'removed', 'delete', 'aliases', 'powers', 'own'].some(k => k in j)) return null;
     return applyLedgerDiff(current, j);
 }
 
@@ -411,9 +426,14 @@ export function buildWhereMessages(ride, current, messages, context = [], userNa
 
 /** The option the answer names (first match on the first line), or null. */
 export function parseWhere(text, options) {
-    const first = String(text || '').split('\n').find(l => l.trim()) || '';
-    const hit = options.map(o => [o, first.toLowerCase().indexOf(o.toLowerCase().replace(/'s body$/, ''))]).filter(([, i]) => i >= 0).sort((a, b) => a[1] - b[1])[0];
-    return hit ? hit[0] : null;
+    const first = (String(text || '').split('\n').find(l => l.trim()) || '').toLowerCase();
+    const key = o => o.toLowerCase().replace(/'s (?:own )?body$/, '');
+    const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Whole names only, so "Ann" never matches inside "Anna"; the earliest in the answer wins, and the longer name on
+    // a tie. "Sam's own body" answers to "Sam" as well.
+    const hits = options.map(o => [o, first.search(new RegExp(`\\b${esc(key(o))}\\b`))]).filter(([, i]) => i >= 0)
+        .sort((a, b) => a[1] - b[1] || key(b[0]).length - key(a[0]).length);
+    return hits.length ? hits[0][0] : null;
 }
 
 /**
@@ -536,6 +556,43 @@ export function keepRides(prev, next, kept) {
     return normalizeLedger({ ...n, bodies: [...n.bodies.filter(b => !back.has(canon(b.body))), ...before] });
 }
 
+/**
+ * One Ledger update, exactly as the extension runs it after a reply: the first build when there's no ledger yet,
+ * otherwise a changes-only update with a second look at every new and every ended body change, then the multi-body
+ * labels. The evals and the Gym call this too, so they score what play does. `ask(messages, maxTokens)` returns the
+ * model's text. An error from the update itself is thrown; the second looks are filters, so if the model can't be
+ * reached for one the update is kept as it was. Returns null when the answer can't be read.
+ */
+export async function ledgerStep({ ledger = null, messages, context = [], userName, userPronouns = '', modes = [], card = '', persona = '', rules = [] }, ask) {
+    const first = !ledger;
+    const msgs = buildLedgerMessages({
+        ledger: ledger || EMPTY_LEDGER, messages, context, userName, userPronouns, modes, rules,
+        card: first ? card : '', persona: first ? persona : '',
+        update: !first,   // after the first build, only the changes: about 0.5 s instead of 2 s, and it tracks better
+    });
+    const read = text => (first ? parseLedger(text) : parseLedgerUpdate(text, ledger));
+    let answer = await ask(msgs, 900);
+    let next = read(answer);
+    // A model that thinks before answering can run out of room partway through the JSON (Haiku 5.5 did, 1 reply in 10):
+    // one more try with plenty of room.
+    if (!next) { answer = await ask(msgs, 4000); next = read(answer); }
+    if (!next) return null;
+    const log = { answer, added: [], ended: [] };
+    if (!first) {
+        // Every new body change gets a second look before it's kept (someone merely near the one doing it used to be listed).
+        try {
+            const v = await verifyNewRides(ledger, next, { messages, context, userName, modes }, ask);
+            next = v.ledger; log.added = v.log;
+        } catch { /* keep the update as it was */ }
+        // And every body that left gets one too: a scene moving on, or the possessor busy in another body, ends nothing.
+        try {
+            const e = await verifyEndedRides(ledger, next, { messages, context, userName, modes }, ask);
+            next = e.ledger; log.ended = e.log;
+        } catch { /* as above */ }
+    }
+    return { ledger: labelMultiRides(next, modes), log };
+}
+
 // Modes the Ledger runs for: the ones where a mind inhabits a body that isn't its own. (Mind changes are left to the
 // Codex; Puppetry steers a body from outside.) Copy Fidelity and Reverse Vore bring in a mode on this list.
 export const LEDGER_MODES = ['Possession', 'Multipossession', 'Skinsuit', 'Hive Mind', 'Reverse Vore', 'Propagation', 'Copy Fidelity', 'Body Swap'];
@@ -567,6 +624,43 @@ export function multiBodyGroups(ledger) {
     return [...groups.values()].filter(g => g.bodies.length > 1 || g.ownToo);
 }
 
+// ------------------------------------------------------------------ quick actions (Possess, Release, Jump)
+// Buttons over the message box write the player's move into their message and tell the Ledger at once, so the reply is
+// written from the new state and the Ledger never has to work it out from the prose.
+
+/** The line a quick action puts in the player's message. `multi`: the player keeps their own body (Multipossession). */
+export function intentLine({ kind, from = '', to = '' }, { multi = false, hive = false } = {}) {
+    if (kind === 'possess') return hive ? `*I absorb ${to} into the hive.*` : `*I possess ${to}.*`;
+    if (kind === 'release') return hive ? `*I release ${from} from the hive.*` : multi ? `*I release ${from}.*` : `*I release ${from} and return to my own body.*`;
+    if (kind === 'jump') return `*I leave ${from} and possess ${to}.*`;
+    return '';
+}
+
+/**
+ * The ledger after a quick action: possess `to`, release `from`, or jump from one to the other. One body at a time
+ * leaves the player's own body empty (a row of its own); with `multi`, their own body stays theirs and in use. With
+ * `hive`, possessing is absorbing someone into the player's hive, and their own body stays theirs too. Once the player
+ * drives nobody, their own body's empty row goes: they're back in it.
+ */
+export function applyIntent(ledger, { kind, from = '', to = '' }, { userName, userPronouns = '', multi = false, hive = false } = {}) {
+    multi ||= hive;
+    const l = normalizeLedger(ledger);
+    const canon = aliasResolver(l);
+    const me = canon(userName);
+    const mine = b => b.driver && canon(b.driver) === me;
+    let bodies = [...l.bodies];
+    if ((kind === 'release' || kind === 'jump') && from) bodies = bodies.filter(b => !(b.body && canon(b.body) === canon(from) && mine(b)));
+    if ((kind === 'possess' || kind === 'jump') && to && canon(to) !== me) {
+        const was = bodies.find(b => b.body && canon(b.body) === canon(to));
+        bodies = bodies.filter(b => b !== was);
+        bodies.push({ body: was?.body || to, pronouns: was?.pronouns || '', driver: userName, driver_pronouns: userPronouns, how: hive ? 'hive mind' : multi ? 'multipossession' : 'possession',
+            host: was?.host || '', notes: was?.notes || '', doing: '', user_knows: 'yes' });
+        if (!multi && !bodies.some(b => b.body && canon(b.body) === me)) bodies.push({ body: userName, pronouns: userPronouns, driver: '', driver_pronouns: '', how: '', host: '', notes: '', doing: '', user_knows: 'yes' });
+    }
+    if (!bodies.some(b => mine(b) && b.body && canon(b.body) !== me)) bodies = bodies.filter(b => !(b.body && canon(b.body) === me && !b.driver));
+    return normalizeLedger({ ...l, bodies });
+}
+
 /** Every body `name` is running right now, their own listed as `name`; empty unless it's more than one. */
 export function bodiesRunBy(ledger, name) {
     return rosterOf(ledger, name).map(r => r.name);
@@ -595,6 +689,8 @@ export function rosterOf(ledger, name) {
 // and the pointer cut all leave swapped bodies out. A hidden swap is still written as each body's owner.
 export const isSwap = b => /swap/i.test(b?.how || '');
 const knownSwap = b => isSwap(b) && b.body && b.driver && b.user_knows !== 'no';
+const pronSub = p => ({ she: 'she', he: 'he' }[lc(p).split('/')[0]] || 'they');
+const upFirst = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
 
 // Each mechanism in its own words. A generic "driven by" on every row, every reply, read as someone operating a
 // body from outside and pulled scenes toward puppetry.
@@ -627,6 +723,20 @@ export function linesFor(text, names) {
 }
 
 /**
+ * One message from the lanes (a box per body): the message box's own text, for the player as a whole, first, then a
+ * [Name] line for each body with something in its lane. A lane's line breaks become spaces: a body's line is one line.
+ * A lane left empty sends nothing, and the turn line tells the writer that body does nothing new.
+ */
+export function joinLanes(general, lanes) {
+    const out = [String(general || '').trim()].filter(Boolean);
+    for (const { name, text } of lanes) {
+        const t = String(text || '').replace(/\s*\n\s*/g, ' ').trim();
+        if (t) out.push(`[${name}] ${t}`);
+    }
+    return out.join('\n');
+}
+
+/**
  * The player's bodies by name for this turn: the ones their message gave a line and the ones it didn't. A general
  * rule lost to a scene that pulled the other way (a customer waiting at an absorbed barista's register); names hold.
  */
@@ -650,7 +760,7 @@ function turnLine(roster, userName, lastUserText) {
  */
 // scene: the last few messages. Given, a taken body's sheet goes in only while the body is in the scene (named there, by
 // any of its names); its row always does. Left out (the /wh-ledger readout), every sheet goes in.
-export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '', sheets = new Map(), back = [], scene = null } = {}) {
+export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '', sheets = new Map(), back = [], scene = null, userPronouns = '' } = {}) {
     const l = normalizeLedger(ledger);
     if (isEmptyLedger(l) && !back.length) return '';
     const lines = [];
@@ -664,22 +774,17 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '',
     for (const b of l.bodies) {
         const body = b.body && b.body.toLowerCase() !== 'none' ? b.body : null;
         const bodyTag = body ? `${body}${b.pronouns ? ` (${b.pronouns})` : ''}` : null;
-        const driverTag = b.driver ? `${b.driver}${b.driver_pronouns ? ` (${b.driver_pronouns})` : ''}` : null;
+        // The player's own pronouns, from Worldhopper's setting, where the Ledger left them out.
+        const driverPron = b.driver_pronouns || (players(b.driver) ? userPronouns : '');
+        const driverTag = b.driver ? `${b.driver}${driverPron ? ` (${driverPron})` : ''}` : null;
         let line;
         if (!bodyTag) line = `${driverTag}: a mind with no body right now`;
         else if (driverTag && !same(b.driver, body)) line = `${bodyTag}: ${rideVerb(b.how)} ${driverTag}${PLAIN_HOW.test(b.how) ? '' : ` (${b.how})`}`;
         else line = `${bodyTag}: empty, nobody inside${b.how ? ` (${b.how})` : ''}`;
         if (bodyTag && b.host) line += `. ${body}'s own mind: ${b.host}`;
-        if (b.notes) line += `. ${b.notes}`;
+        if (b.notes) line += `. ${upFirst(b.notes)}`;
         if (b.doing && !players(b.driver)) line += `. Busy with: ${b.doing}`;
         if (b.user_knows === 'no' && body && b.driver) { line += `. HIDDEN from ${userName}`; hidden.push(b); }
-        // The player's own bodies are "you". Said on the row itself, since a chat that started under the old way
-        // (the body in third person) keeps pulling the reply back to it.
-        if (body && players(b.driver) && !same(b.driver, body)) {
-            const subj = String(b.pronouns || '').split('/')[0].trim().toLowerCase() || 'they';
-            const [poss, own] = { she: ['her', 'hers'], he: ['his', 'his'], they: ['their', 'theirs'] }[subj] || ['their', 'theirs'];
-            line += `. In the narration this body is "you", its parts too: "you lean on the desk", "your arms", "people smile at you", never "${body} leans", "${body}'s arms" or "${subj} leans", even where earlier replies wrote it that way. ${body}'s own things stay ${own} ("${body}'s phone", "${poss} bag"); only ${b.driver}'s own things are "your"`;
-        }
         lines.push(`- ${line}.`.replace(/\.\.$/, '.'));
         if (body && b.driver && !same(b.driver, body) && sheetOf(body)) lines.push(who(body, sheetOf(body)));
     }
@@ -688,7 +793,7 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '',
     const ownLine = who => {
         const own = l.own.find(o => canon(o.who) === canon(who));
         const busy = own?.doing && !players(who) ? `. Busy with: ${own.doing}` : '';
-        lines.push(`- ${who}'s own body: still ${who}'s, awake and in use${own?.notes ? `. ${own.notes}` : ''}${busy}.`.replace(/\.\.$/, '.'));
+        lines.push(`- ${who}'s own body: still ${who}'s, awake and in use${own?.notes ? `. ${upFirst(own.notes)}` : ''}${busy}.`.replace(/\.\.$/, '.'));
     };
     const groups = multiBodyGroups(l);
     for (const g of groups) if (g.ownToo) ownLine(g.driver);
@@ -702,32 +807,54 @@ export function renderLedger(ledger, userName = '{{user}}', { lastUserText = '',
             rules.push(`${list(bodies)} are all ${g.driver}: one person in several places. They touch, pleasure, look at and talk about each other freely, since that is one person enjoying their own bodies, but they never converse with each other as if they were separate people, except as staged talk in front of someone who doesn't know. ${independent}`);
         }
     }
-    if (roster.length) {
-        const names = [...roster.filter(r => !r.own).map(r => r.name), ...(roster.some(r => r.own) ? [`${userName}'s own body`] : [])];
-        rules.push(`${list(names)} belong to ${userName}, the player: write none of them beyond what ${userName} wrote, exactly as you never write ${userName}. Each does only what ${userName} wrote for it, with nothing added. A body ${userName} gave nothing this turn does nothing new: if someone speaks to it or waits on it, write that person and stop, leaving the answer to ${userName}.`);
-        const turn = turnLine(roster, userName, lastUserText);
+    // The player's bodies, one or several: "you", and nothing written for them beyond what the player wrote. The rule
+    // used to come only with two or more bodies, and the Writer Gym's one-body scenes were where replies acted for the
+    // player (2026-11-01). Said once, in plain terms: a "you" line on every row, with the wrong forms quoted ("never
+    // 'Kayla leans'"), primed the very forms it named. Copies are their own people and never count.
+    const mine = [...new Set(l.bodies.filter(b => b.body && !same(b.body, 'none') && players(b.driver) && !same(b.body, b.driver) && !COPY.test(b.how)).map(b => b.body))];
+    if (mine.length || roster.length) {
+        const names = [...(roster.length ? roster.filter(r => !r.own).map(r => r.name) : mine), ...(roster.some(r => r.own) ? [`${userName}'s own body`] : [])];
+        const one = names.length === 1;
+        const ex = mine[0] || names[0];
+        rules.push(`${list(names)} ${one ? 'is' : 'are'} ${userName}'s to play. In the narration ${one ? 'that body is' : 'each of them is'} "you": your hands, your face, what you do, how people look at you, even where earlier replies named ${one ? 'it' : 'them'} in the third person. ${one ? 'The' : 'A'} body's name only says which body ("as ${ex}, you…") or whose things they are: ${ex}'s own things stay ${ex}'s ("${ex}'s phone"), and only ${userName}'s own things are "your". `
+            + (one ? `Write nothing of what ${ex} does, says, thinks or feels beyond what ${userName} wrote, exactly as you never write ${userName}. If someone speaks to ${ex} or waits on an answer ${userName} didn't give, write that person and stop, leaving the answer to ${userName}.`
+                : `Write nothing of what they do, say, think or feel beyond what ${userName} wrote for each, exactly as you never write ${userName}; a body ${userName} gave nothing this turn does nothing new. If someone speaks to one of them or waits on an answer ${userName} didn't give, write that person and stop, leaving the answer to ${userName}.`));
+        const turn = roster.length ? turnLine(roster, userName, lastUserText) : '';
         if (turn) rules.push(turn);
     }
     const swapped = l.bodies.filter(knownSwap);
     if (swapped.length) {
         const people = [...new Set(swapped.map(b => b.driver))];
-        const ex = swapped[0];
-        rules.push(`${list(people)} ${people.length > 1 ? 'have' : 'has'} swapped bodies, and for them the narration follows the person, not the body, so it's always clear who is doing what: each keeps their own name and pronouns for what they do, say and think, and the narration says whose body it is wherever that helps ("${ex.driver} reaches out with ${ex.body}'s hand"). People who don't know about the swap still treat each body as its owner. This replaces the naming above for swapped bodies.`);
+        const yours = swapped.find(b => players(b.driver));
+        const other = swapped.find(b => !players(b.driver));
+        if (yours) {
+            // The player's own example in the second person: "Rika reaches out with Rowan's hand" taught the writer to
+            // name the player in a swap, against the "you" rule above.
+            const poss = { she: 'her', he: 'his' }[lc(other?.driver_pronouns).split('/')[0]] || 'their';
+            const theirs = other ? ` ${other.driver} keeps ${poss} own name and pronouns for what ${pronSub(other.driver_pronouns)} ${pronSub(other.driver_pronouns) === 'they' ? 'do' : 'does'}, say${pronSub(other.driver_pronouns) === 'they' ? '' : 's'} and think${pronSub(other.driver_pronouns) === 'they' ? '' : 's'}, with whose body it is said where that helps ("${other.driver}, in ${players(other.body) ? 'your' : `${other.body}'s`} body, folds ${poss} arms").` : '';
+            rules.push(`${list(people)} have swapped bodies. You are in ${yours.body}'s body and stay "you", with whose body it is said where that helps ("you reach out with ${yours.body}'s hand").${theirs} People who don't know about the swap still treat each body as its owner.`);
+        } else {
+            const ex = swapped[0];
+            rules.push(`${list(people)} ${people.length > 1 ? 'have' : 'has'} swapped bodies, and for them the narration follows the person, not the body, so it's always clear who is doing what: each keeps their own name and pronouns for what they do, say and think, and the narration says whose body it is wherever that helps ("${ex.driver} reaches out with ${ex.body}'s hand"). People who don't know about the swap still treat each body as its owner. This replaces the naming above for swapped bodies.`);
+        }
     }
+    // A ride kept from the player: the narration shows only the body. "His habits may show in what she does" asked for
+    // the very tells the narration then had to explain away.
     for (const b of hidden) {
         const her = (b.pronouns.split('/')[0] || 'they').toLowerCase();
-        rules.push(`${userName} doesn't know that ${b.body} is ${b.driver}. In narration ${her === 'they' ? 'they are' : `${her} is`} only ${b.body}, with ${b.body}'s own name and pronouns, and nothing mentions, hints at, or explains that anyone else is inside. ${b.driver}'s habits may show in what ${b.body} does, written as ${b.body}'s own behavior; only what ${userName} could actually notice reaches the page.`);
+        const obj = { she: 'her', he: 'him' }[her] || 'them';
+        rules.push(`${userName} doesn't know that ${b.body} is ${b.driver}. In narration ${her === 'they' ? 'they are' : `${her} is`} only ${b.body}, with ${b.body}'s own name and pronouns, and nothing mentions, hints at or explains that anyone else is inside: whatever ${b.driver} does through ${obj} is written as what ${b.body} does and says, the way anyone watching would see it.`);
     }
     const powers = l.powers.map(p => `${p.who}: ${p.power}`).join('; ');
     const aliases = l.aliases.map(a => `${a.name} = ${a.aka.join(' = ')}`).join('; ');
     const hasBodies = l.bodies.length > 0 || lines.length > 0;
     const anySheet = lines.some(x => x.startsWith('  Who ')) || back.length > 0;
-    // The player is "you" in every body they drive; the two-referent rule is for bodies someone else drives.
-    const playerDrives = l.bodies.some(b => b.body && b.body.toLowerCase() !== 'none' && players(b.driver) && !same(b.body, b.driver));
+    // The two names are for bodies someone else drives; the player is "you" in theirs (the rule above).
+    const othersDrive = l.bodies.some(b => b.body && !same(b.body, 'none') && b.driver && !players(b.driver) && !same(b.body, b.driver) && !knownSwap(b));
     return [
         '<body_ledger>',
         ...(hasBodies ? [
-            `Who is in which body right now. Where ${userName} knows, everything the world sees of a body uses that body's own name and pronouns, and anything about the mind inside it (what it wants, decides, thinks, or is) uses the mind's own name and pronouns. Either way, that mind's habits show as the body's own behavior, written plainly, with no narration pointing out who is inside.${playerDrives ? ` In a body ${userName} drives, the narration calls ${userName} "you" for everything instead, and uses the body's name only to say which body.` : ''}`,
+            `Who is in which body right now.${othersDrive ? ` Where ${userName} knows who is inside a body someone else drives, everything the world sees of it (how it moves and sounds, how people address it) uses the body's own name and pronouns, and the mind inside keeps its own name and pronouns only for what it thinks, wants or decides. Narration never points out who is inside.` : ''}`,
             ...lines,
             `Everyone else, ${userName} included unless listed, is in their own body.`,
         ] : []),
@@ -748,18 +875,27 @@ Cut exactly these, and nothing else:
 {{rules}}
 Copy each cut exactly, character for character, as it appears in the prose. Cut the smallest piece that removes the problem: a clause, a sentence, or one spoken line together with its speech tag. If nothing needs cutting, answer NONE.
 Answer only in this form, one line per cut, or the single word NONE:
-CUT: <exact text>`;
+{{format}}`;
 
-export function buildLintMessages(text, ledger, userName = 'the player') {
+// Each cut names the rule it breaks, and a CONVERSING cut the body the line is spoken to, so the cutter can check the
+// claim before it cuts (cutEvidence). Without the tags, a model cut two of one mind's bodies answering the player in
+// turn as "conversing" (the Writer Gym, 2026-11-01: 4 of 5 cuts on real replies were fine lines).
+export const CUT_FORMAT = 'CUT [RULE]: <exact text>\nwhere RULE is the rule\'s name: CONVERSING, SYNC, POINTER or SECRET. For CONVERSING, add the body the line is spoken to: CUT [CONVERSING → Donna]: <exact text>';
+
+/**
+ * The cut check's request. `lastUserText` is the player's message the prose answers: without it, two bodies of one
+ * mind answering the player's question read as answering each other, and got cut as conversing (Writer Gym, 2026-11-01).
+ */
+export function buildLintMessages(text, ledger, userName = 'the player', { lastUserText = '' } = {}) {
     const l = normalizeLedger(ledger);
     const rules = [];
     const groups = multiBodyGroups(l);
     for (const g of groups) {
         const bodies = [...g.bodies, ...(g.ownToo ? [g.driver] : [])];
         if (!g.hidden) {   // when the player doesn't know, the bodies are right to talk like separate people
-            rules.push(`- BODIES CONVERSING. ${list(bodies)} are all one person, ${g.driver}. Cut any spoken line, with its speech tag, in which one of them addresses, answers, jokes with, or argues with another of them as though it were a different person, and narration that frames such an exchange ("a joke with herself", "the other body adds", "answering himself"). NEVER cut touching, kissing, sex, pleasuring, or looking at each other, and never cut one body talking ABOUT another to someone else: those are expected.`);
+            rules.push(`- CONVERSING. ${list(bodies)} are all one person, ${g.driver}. Cut a spoken line, with its speech tag, only when one of them is speaking TO another of them as though it were a different person (addressing it, answering what it just said, joking or arguing with it), and narration that frames such an exchange ("a joke with herself", "answering himself"). A line spoken to anyone else is never this, not even when two of them speak one after the other or one finishes what another started: that is one person talking through two mouths. NEVER cut touching, kissing, sex, pleasuring, or looking at each other, and never cut one body talking ABOUT another, or about ${g.driver}'s own body, to someone else.`);
         }
-        rules.push(`- BODIES IN SYNC. Narration in which two or more of ${list(bodies)} do the same thing at the same moment, move in unison, mirror each other, or speak in chorus ("both glance over at the same instant", "all four speaking at once", "in perfect sync"). Cut the sentence or clause that describes it. Different bodies doing different things at once is correct and stays. Leave it only if the story shows ${g.driver} is new to the ability.`);
+        rules.push(`- SYNC. Narration in which two or more of ${list(bodies)} do the same thing at the same moment, move in unison, mirror each other, or speak the same words in chorus ("both glance over at the same instant", "all four speaking at once", "in perfect sync"). Cut the sentence or clause that describes it. Different bodies doing different things at once is correct and stays, and so do two of them speaking one after the other. Leave it only if the story shows ${g.driver} is new to the ability.`);
     }
     // Swapped bodies are named through the person inside on purpose, so the pointer cut leaves them alone.
     const swaps = [...new Set(l.bodies.filter(knownSwap).map(b => b.body))];
@@ -768,15 +904,56 @@ export function buildLintMessages(text, ledger, userName = 'the player') {
     const canon = aliasResolver(l);
     const mine = [...new Set(l.bodies.filter(b => b.body && b.driver && canon(b.driver) === canon(userName) && !same(b.body, b.driver)).map(b => b.body))];
     if (mine.length) rules.push(`- Never cut narration that calls ${userName} "you" in ${list(mine)}, or that names the body to say which one "you" are moving ("as ${mine[0]}, you pour") or whose things they are ("${mine[0]}'s phone"): that is how the story talks about ${userName}'s own bodies. Words like "borrowed" or "isn't hers" still get cut.`);
-    if (l.bodies.some(b => b.body && b.driver && !same(b.body, b.driver) && !knownSwap(b))) rules.push('- POINTERS. Narration that points out someone else is inside a body: "Marcus\'s mannerism on her face", "his smile on her mouth", "her borrowed face", "someone else\'s mouth", "a smile that isn\'t hers", "something behind her eyes", "the amusement doesn\'t reach her eyes", "the same grin on three faces", "Victor\'s cadence makes it unsettling", bodies moving in eerie unison. Cut only the pointing words and keep the action: from "Dana rolls her eyes—Marcus\'s mannerism on her face." cut "—Marcus\'s mannerism on her face"; from "Cole\'s borrowed eyes go wide." cut just "borrowed " so it reads "Cole\'s eyes go wide."');
+    if (l.bodies.some(b => b.body && b.driver && !same(b.body, b.driver) && !knownSwap(b))) rules.push('- POINTER. Narration that points out someone else is inside a body: "Marcus\'s mannerism on her face", "his smile on her mouth", "her borrowed face", "someone else\'s mouth", "a smile that isn\'t hers", "something behind her eyes", "the amusement doesn\'t reach her eyes", "the same grin on three faces", "Victor\'s cadence makes it unsettling", bodies moving in eerie unison. Cut only the pointing words and keep the action: from "Dana rolls her eyes—Marcus\'s mannerism on her face." cut "—Marcus\'s mannerism on her face"; from "Cole\'s borrowed eyes go wide." cut just "borrowed " so it reads "Cole\'s eyes go wide."');
     for (const b of l.bodies.filter(b => b.user_knows === 'no' && b.body && b.driver)) {
         const aka = akaOf(l, b.driver);
-        rules.push(`- SECRETS. ${userName} does not know that ${b.body} is being driven by ${b.driver}${aka.length ? ` (also called ${aka.join(', ')})` : ''}. Cut narration that reveals or hints at it (naming ${b.driver} as the one inside ${b.body}, "possessed", "inside her", "wearing her", "piloting").`);
+        rules.push(`- SECRET. ${userName} does not know that ${b.body} is being driven by ${b.driver}${aka.length ? ` (also called ${aka.join(', ')})` : ''}. Cut narration that reveals or hints at it (naming ${b.driver} as the one inside ${b.body}, "possessed", "inside her", "wearing her", "piloting").`);
     }
     return [
-        { role: 'system', content: LINT_SYSTEM.replace('{{rules}}', rules.join('\n')) },
-        { role: 'user', content: `Prose:\n<<<\n${text}\n>>>` },
+        { role: 'system', content: LINT_SYSTEM.replace('{{rules}}', rules.join('\n')).replace('{{format}}', CUT_FORMAT) },
+        { role: 'user', content: `${lastUserText ? `${userName}'s message, which the prose answers (for context only; a line that answers it is spoken to ${userName}):\n<<<\n${String(lastUserText).slice(0, 1500)}\n>>>\n\n` : ''}Prose:\n<<<\n${text}\n>>>` },
     ];
+}
+
+const SYNC_WORDS = /\b(both|all (?:two|three|four|five|of them)|together|in unison|at once|the same (?:time|instant|moment|second)|simultaneous\w*|in sync|perfect sync|mirror\w*|in chorus|lockstep|identical|the same (?:smile|grin|look|motion|movement|expression|words?))\b/i;
+const POINTER_WORDS = /\b(borrowed|(?:is|was)n['’]t (?:hers|his|theirs)|not (?:hers|his|theirs|her own|his own|their own)|someone else|behind (?:her|his|their) eyes|mannerism|cadence|inside (?:her|him|them)|wearing (?:her|him|them)|piloting|puppet\w*|the same (?:grin|smile) on)\b/i;
+const SECRET_WORDS = /\b(possess\w*|inside (?:her|him|them)|wearing (?:her|him|them)|piloting|behind (?:her|his|their) eyes|someone else|borrowed|(?:is|was)n['’]t (?:hers|his|theirs))\b/i;
+
+/**
+ * Whether a cut fits the rule it names, as far as the words can show: null when it does, else why not. `info` is
+ * cutInfo()'s. CONVERSING needs the body it's spoken to, and that body must be another of one known mind's bodies;
+ * SYNC needs two of one mind's bodies named, or words of unison; POINTER and SECRET need the rider named, or words that
+ * say someone else is inside. A cut with no rule (an older "CUT: …" answer) passes if it fits any of them.
+ */
+export function cutEvidence(cut, rule, to, info) {
+    const t = String(cut || '');
+    const names = ns => ns.some(n => n && new RegExp(`(?<![\\p{L}])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}])`, 'iu').test(t));
+    const conversing = () => {
+        if (!to) return 'no body named that the line is spoken to';
+        const g = info.groups.find(x => !x.hidden && x.names.some(n => same(n, to)));
+        if (!g) return `${to} isn't another body of a mind with several`;
+        if (same(to, info.user)) return 'spoken to the player';
+        return /["“”]|\b(?:herself|himself|themself|themselves|each other|one another|the other (?:body|one))\b/i.test(t) ? null : 'not a spoken exchange';
+    };
+    const sync = () => (info.groups.some(g => g.names.filter(n => names([n])).length >= 2) || SYNC_WORDS.test(t) ? null : 'names no two bodies of one mind and nothing in unison');
+    const pointer = () => (names(info.riders) || POINTER_WORDS.test(t) ? null : 'names no rider and says nothing of someone inside');
+    const secret = () => (names(info.secrets) || SECRET_WORDS.test(t) ? null : 'names no hidden rider and says nothing of someone inside');
+    switch (String(rule || '').toUpperCase()) {
+        case 'CONVERSING': return conversing();
+        case 'SYNC': return sync();
+        case 'POINTER': return pointer();
+        case 'SECRET': return secret();
+        default: return [sync, pointer, secret].some(f => !f()) ? null : 'fits no rule';
+    }
+}
+
+/** What cutEvidence needs from a ledger: each mind's bodies, every rider's names, and the hidden riders'. */
+export function cutInfo(ledger, userName = '') {
+    const l = normalizeLedger(ledger);
+    const groups = multiBodyGroups(l).map(g => ({ hidden: g.hidden, names: [...g.bodies, ...(g.ownToo ? [g.driver] : []), ...g.bodies.flatMap(b => akaOf(l, b))] }));
+    const rode = l.bodies.filter(b => b.body && b.driver && !same(b.body, b.driver) && !knownSwap(b));
+    const withAka = bs => [...new Set(bs.flatMap(b => [b.driver, ...akaOf(l, b.driver)]))];
+    return { groups, riders: withAka(rode), secrets: withAka(rode.filter(b => b.user_knows === 'no')), user: userName };
 }
 
 /** A regex that matches `s` while ignoring dash style/spacing, quote style, and runs of whitespace. */
@@ -812,21 +989,29 @@ function locateLoose(text, cut) {
     return [s, e];
 }
 
+/** The cuts in an answer: { text, rule, to } each ("CUT [CONVERSING → Donna]: …"; an older "CUT: …" has no rule). */
 export function parseLintResponse(text) {
-    return String(text || '').split('\n').map(l => l.match(/^\s*CUT:\s*(.+?)\s*$/i)?.[1]).filter(Boolean);
+    return String(text || '').split('\n').map(l => /^\s*CUT\s*(?:\[([^\]]*)\])?\s*:\s*(.+?)\s*$/i.exec(l)).filter(Boolean).map(m => {
+        const [rule = '', to = ''] = String(m[1] || '').split(/\s*(?:→|->)\s*/);
+        return { text: m[2], rule: rule.trim().toUpperCase(), to: to.trim() };
+    });
 }
 
 /**
  * Apply cut-only fixes. Every cut must appear verbatim, stay under 400 characters, keep its quote marks
- * balanced, and all cuts together may remove at most 40% of the reply.
+ * balanced, and all cuts together may remove at most 40% of the reply. Cuts are strings, or parseLintResponse's
+ * { text, rule, to }; given `ledger` (and `userName`), a body-rule cut must also fit the rule it names (cutEvidence).
  */
-export function applyCuts(text, cuts) {
+export function applyCuts(text, cuts, { ledger = null, userName = '' } = {}) {
     let out = text;
     const applied = [], rejected = [];
     let removed = 0;
-    for (let cut of cuts) {
-        cut = cut.replace(/^<<<|>>>$/g, '').trim();
+    const info = ledger ? cutInfo(ledger, userName) : null;
+    for (const item of cuts) {
+        let cut = String(typeof item === 'string' ? item : item?.text || '').replace(/^<<<|>>>$/g, '').trim();
         if (!cut) continue;
+        const why = info ? cutEvidence(cut, item?.rule, item?.to, info) : null;
+        if (why) { rejected.push({ cut, why }); continue; }
         let at = out.indexOf(cut);
         // allow the model to drop the outer asterisks of an italic span
         if (at < 0 && out.indexOf(`*${cut}*`) >= 0) { cut = `*${cut}*`; at = out.indexOf(cut); }
@@ -846,7 +1031,7 @@ export function applyCuts(text, cuts) {
         if (leavesBroken(out, next)) { rejected.push({ cut, why: 'leaves a broken sentence' }); continue; }
         out = next;
         removed += cut.length;
-        applied.push({ action: 'CUT', from: cut });
+        applied.push({ action: 'CUT', from: cut, ...(item?.rule ? { rule: item.rule } : {}) });
     }
     out = out
         .replace(/[ \t]*[—–][ \t]*([.!?,;])/g, '$1')            // "tilts her head —." → "tilts her head."
@@ -1015,11 +1200,15 @@ const phrase = (v, max = 160) => {
     return s.slice(0, max).replace(/[\s,;]+\S*$/, '');
 };
 
+// The aftermath of a ride, noted when it ends: what the host remembers and how they explain it to themselves, what
+// they're now held to (said, sent or promised in their name), who saw what, what the driver took, and what changed.
+export const NOTE_FIELDS = ['remembers', 'believes', 'owns', 'seen', 'kept', 'left'];
+
 export function normalizeNotes(raw) {
     return (Array.isArray(raw) ? raw : []).map(n => ({
         driver: str(n?.driver, 60), body: str(n?.body, 60),
-        remembers: phrase(n?.remembers), kept: phrase(n?.kept), left: phrase(n?.left),
-    })).filter(n => n.driver && n.body && (n.remembers || n.kept || n.left));
+        ...Object.fromEntries(NOTE_FIELDS.map(k => [k, phrase(n?.[k])])),
+    })).filter(n => n.driver && n.body && NOTE_FIELDS.some(k => n[k]));
 }
 
 /**
@@ -1027,68 +1216,94 @@ export function normalizeNotes(raw) {
  * everything but their name (a rig of unnamed hosts released together) folded into one. Used by the prompt text
  * and the settings panel.
  */
-export function historyGroups(episodes, { max = 10 } = {}) {
+// `edits` are your corrections, by pair key: { removed } hides the rides that had ended by then (a ride after it shows
+// again), and { at, notes, how, host, user_knows } stands in for what the notes model and the Ledger said up to then.
+// A ride that ends after the edit adds its own notes on top.
+export function historyGroups(episodes, { max = 10, edits = {} } = {}) {
     const pairs = new Map();
     for (const ep of episodes) {
         const key = ep.key ?? pairKey(ep.driver, ep.body);
-        const p = pairs.get(key) || { driver: ep.driver, body: ep.body, ended: 0, ongoing: false, lastEnd: -1, how: '', host: '', user_knows: 'yes', notes: {} };
+        const e = edits[key];
+        const before = at => ep.end != null && at != null && ep.end <= at;
+        if (before(e?.removed)) continue;
+        const p = pairs.get(key) || { key, driver: ep.driver, body: ep.body, ended: 0, ongoing: false, lastEnd: -1, how: '', host: '', user_knows: 'yes',
+            notes: Object.fromEntries(NOTE_FIELDS.filter(k => e?.notes?.[k]).map(k => [k, e.notes[k]])) };
         if (ep.end == null) p.ongoing = true;
         else { p.ended++; p.lastEnd = Math.max(p.lastEnd, ep.end); }
         p.how = ep.how || p.how;
         p.host = ep.host || p.host;
         p.user_knows = ep.user_knows || p.user_knows;
-        for (const k of ['remembers', 'kept', 'left']) if (ep.notes?.[k]) p.notes[k] = ep.notes[k];
+        if (!(e?.notes && before(e.at))) for (const k of NOTE_FIELDS) if (ep.notes?.[k]) p.notes[k] = ep.notes[k];
         pairs.set(key, p);
     }
+    for (const [key, p] of pairs) for (const f of ['how', 'host', 'user_knows']) if (edits[key] && f in edits[key]) p[f] = edits[key][f];
     // Bodies that share everything but their name (a rig of unnamed hosts released together) get one line.
     const groups = new Map();
     for (const p of [...pairs.values()].filter(p => p.ended)) {
         const sig = JSON.stringify([p.driver.toLowerCase(), p.ended, p.ongoing, p.how, p.notes.remembers ? '' : p.host, p.notes, p.user_knows]);
-        const g = groups.get(sig) || { ...p, bodies: [] };
+        const g = groups.get(sig) || { ...p, bodies: [], keys: [] };
         g.bodies.push(p.body);
+        g.keys.push(p.key);
         g.lastEnd = Math.max(g.lastEnd, p.lastEnd);
         groups.set(sig, g);
     }
     return [...groups.values()].sort((a, b) => b.lastEnd - a.lastEnd).slice(0, max);
 }
 
-/** The text injected into the prompt. Only ended rides: the Ledger already covers what is happening now. */
-export function renderHistory(episodes, userName = '{{user}}', { max = 10 } = {}) {
-    const lines = historyGroups(episodes, { max }).map(g => {
+/**
+ * The text injected into the prompt. Only ended rides: the Ledger already covers what is happening now. With `scene`
+ * (the latest messages), the full aftermath goes to people named in it, the ones a reply can actually meet; everyone
+ * else gets one line.
+ */
+export function renderHistory(episodes, userName = '{{user}}', { max = 10, scene = null, edits = {} } = {}) {
+    const lines = historyGroups(episodes, { max, edits }).map(g => {
         const many = g.bodies.length > 1;
         const who = list(g.bodies);
         const times = (g.ended === 1 ? 'once' : g.ended === 2 ? 'twice' : `${g.ended} times`) + (many ? ' each' : '');
         let line = `- ${g.driver} has been in ${who} ${times}${g.how ? ` (${g.how})` : ''}${g.ongoing ? ', and is again now' : ''}.`;
-        if (g.notes.remembers) line += ` ${who} ${many ? 'remember' : 'remembers'}: ${g.notes.remembers}.`;
-        else if (g.host) line += ` ${many ? 'Their own minds' : `${who}'s own mind`} while ridden: ${g.host}.`;
-        if (g.notes.kept) line += ` ${g.driver} kept: ${g.notes.kept}.`;
-        if (g.notes.left) line += ` It left ${many ? 'them' : who} with: ${g.notes.left}.`;
+        const here = scene == null || g.bodies.some(b => personNamedIn(scene, [b]));
+        if (here) {
+            if (g.notes.remembers) line += ` ${who} ${many ? 'remember' : 'remembers'}: ${g.notes.remembers}.`;
+            else if (g.host) line += ` ${many ? 'Their own minds' : `${who}'s own mind`} while ridden: ${g.host}.`;
+            if (g.notes.believes) line += ` As ${many ? 'they see' : `${who} sees`} it: ${g.notes.believes}.`;
+            if (g.notes.owns) line += ` Held to: ${g.notes.owns}.`;
+            if (g.notes.seen) line += ` Seen: ${g.notes.seen}.`;
+            if (g.notes.kept) line += ` ${g.driver} kept: ${g.notes.kept}.`;
+            if (g.notes.left) line += ` It left ${many ? 'them' : who} with: ${g.notes.left}.`;
+        }
         if (g.user_knows === 'no') line += ` HIDDEN from ${userName}.`;
         return line.replace(/\.\./g, '.');
     });
     if (!lines.length) return '';
     return [
         '<body_history>',
-        `Possessions in this story that have ended (who is in which body right now is in the Body Ledger). This is continuity: people live with the consequences the way they naturally would (lost time, what was taken, what changed), but narration doesn't recap these rides or point back at them, and whatever is hidden from ${userName} stays hidden.`,
+        `Possessions in this story that have ended (who is in which body right now is in the Body Ledger). This is continuity: people live with the consequences the way they naturally would. Someone who was ridden acts on what they believe happened and on what they're held to, never on the truth they don't know, and people who saw something remember it. Narration doesn't recap these rides or point back at them, and whatever is hidden from ${userName} stays hidden.`,
         ...lines,
         '</body_history>',
     ].join('\n');
 }
 
-export const HISTORY_SYSTEM = `You keep continuity notes for an adult roleplay in which minds take over bodies. One or more possessions have just ended: the driving mind has left the body. From the messages, note for each one:
-- remembers: what the body's own person is shown to remember or believe about the ridden time, judged by what they say or do once they're themselves again. "" if the messages don't show them after the ride.
+export const HISTORY_SYSTEM = `You keep the aftermath of possessions in an adult roleplay: what a ride leaves behind once the driving mind has left a body, so later scenes stay true to it. One or more possessions have just ended. From the messages, note for each one:
+- remembers: what the body's own person remembers of the ridden time, judged by what they say or do once they're themselves again, or by the card's rule when one is given. "" if neither shows it.
+- believes: how they explain the ridden time to themselves, in their own terms ("a night she drank too much", "zoned out at her desk"), when the messages or the card's rule make it plain. "" otherwise.
+- owns: what was said, sent, promised or done in their name while ridden that the people around them will now hold them to, and who it was said or sent to, in under 25 words. "" if nothing.
+- seen: who saw the host do or say something during the ride that they'll bring up with the host later, and what, in under 20 words. What anyone worked out about the powers isn't noted here. "" if nobody did.
 - kept: only something the driver took away on leaving: memories or skills copied out, or an object carried off in another body. Things that stay with the host are not "kept".
-- left: lasting consequences for the body's own person, in under 15 words: visible marks, changes to the body, things done or promised in their name. No tastes, aches or feelings.
-Give each body only what the messages show for that body. An empty field is better than a wrong one: write "" for anything the messages don't clearly show.
+- left: lasting changes to the body itself, in under 15 words: marks, changes to how it looks or feels. No tastes, aches or moods.
+Give each body only what the messages show for that body (and the card's rule, for remembers and believes). An empty field is better than a wrong one: write "" for anything not clearly shown.
 Answer with JSON only, in exactly this shape:
-[{"driver":"","body":"","remembers":"","kept":"","left":""}]`;
+[{"driver":"","body":"","remembers":"","believes":"","owns":"","seen":"","kept":"","left":""}]`;
 
-/** @param {{driver, body, host}[]} ended  @param {{name:string, text:string}[]} messages  newest messages, oldest first */
-export function buildHistoryMessages(ended, messages) {
+/**
+ * @param {{driver, body, host}[]} ended  @param {{name:string, text:string}[]} messages  newest messages, oldest first
+ * @param {{aftermath?: string}} [o]  what the card's rules say a host remembers (rules-core), when they say
+ */
+export function buildHistoryMessages(ended, messages, { aftermath = '' } = {}) {
     const list = ended.map(b => `- ${b.driver} has left ${b.body}${b.host ? ` (while ridden, ${b.body}'s own mind was ${b.host})` : ''}`).join('\n');
+    const rule = aftermath ? `\n\nThe card's rule for every host: when the rider leaves, the host remembers ${aftermath.charAt(0).toLowerCase() + aftermath.slice(1)}. Unless the messages show otherwise, that is what "remembers" says.` : '';
     return [
         { role: 'system', content: HISTORY_SYSTEM },
-        { role: 'user', content: `Possessions that just ended:\n${list}\n\nNewest messages, oldest first:\n${messages.map(m => `### ${m.name}\n${clip(m.text, 2500)}`).join('\n\n')}\n\nNow output the JSON.` },
+        { role: 'user', content: `Possessions that just ended:\n${list}${rule}\n\nNewest messages, oldest first:\n${messages.map(m => `### ${m.name}\n${clip(m.text, 2500)}`).join('\n\n')}\n\nNow output the JSON.` },
     ];
 }
 
@@ -1100,6 +1315,6 @@ export function parseHistoryResponse(text, ended) {
     if (!Array.isArray(raw)) return [];
     const wanted = new Set(ended.map(e => pairKey(e.driver, e.body)));
     const empty = /^(none|none shown|not shown|n\/a|unknown|nothing stated|not stated|-)$/i;
-    return normalizeNotes(raw.map(n => ({ ...n, ...Object.fromEntries(['remembers', 'kept', 'left'].map(k => [k, empty.test(String(n?.[k] ?? '').trim()) ? '' : n?.[k]])) })))
+    return normalizeNotes(raw.map(n => ({ ...n, ...Object.fromEntries(NOTE_FIELDS.map(k => [k, empty.test(String(n?.[k] ?? '').trim()) ? '' : n?.[k]])) })))
         .filter(n => wanted.has(pairKey(n.driver, n.body)));
 }

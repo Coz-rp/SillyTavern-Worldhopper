@@ -1,0 +1,1 @@
+[Reminder: hypnosis takes its time. Using it this turn means taking the next real step (an induction, a deepening, a suggestion, a trigger), never rushing to the end: a trance deepens over minutes, and real depth is earned across sessions.]

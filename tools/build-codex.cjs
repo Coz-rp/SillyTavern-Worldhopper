@@ -30,8 +30,9 @@ Every entry in this book is stored DISABLED on purpose. The extension switches o
 • 👁 Metaphysics Core, whenever any mode is picked for the current character
 • 👁 Metaphysics Core · bodies, with any mode where a mind drives a body that isn't its own; · several bodies, with Multipossession, Hive Mind, or Puppetry
 • each 👁 mode picked in the Worldhopper Engine panel (Extensions → Worldhopper Engine → Modes)
-• the ⛓ anchor of each picked mode that has one (depth 0), and ⛓ Initiative Anchor with any mode
-• 📖 detail entries of picked modes, only when their topic words appear in the last two messages (depth 1, sticky 3)
+• the ⛓ anchor of each picked mode that has one (depth 0), and ⛓ Initiative Anchor with any mode; with the Body Ledger running, the reminders about one kind of body only while such a body exists
+• 🔗 a combination note only when every mode it names is picked
+• 📖 detail entries of picked modes, when their topic words appear in the last two messages (depth 1, sticky 3); with the Body Ledger or Mind Book running, the ones that fire on everyday words only while their situation exists
 Without the extension nothing here fires, so a missing or broken extension can never inject the wrong mode.
 
 Source: the extension's codex/ folder, built with tools/build-codex.cjs. Edits made here are kept, but the extension then stops updating this book automatically and offers the update instead. }}`;
@@ -68,6 +69,7 @@ const add = (comment, content, o = {}) => {
 
 add('✦ README — keep this OFF', README, { order: 1, triggers: [] });
 for (const m of files('modes')) add(`👁 ${m.name}`, m.text, { order: CORE_ORDER[m.name] ?? 100 });
+for (const c of files('combos')) add(`🔗 ${c.name}`, c.text, { order: 110 });
 for (const a of files('anchors')) add(`⛓ ${a.name}`, a.text, { position: 4, depth: 0, role: 0 });
 for (const d of files('details')) {
     const [head, ...rest] = d.text.split(/^---$/m);

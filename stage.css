@@ -1,0 +1,1023 @@
+/* Worldhopper Engine — Stage mode: an optional look for the whole of SillyTavern, switched on at the top of the
+   Worldhopper panel, from the wand menu or with the masks on the bodies strip. Everything here sits under body.wh-stage, so switching it off leaves
+   SillyTavern, and any theme, exactly as it was.
+   Colors come from the theme: Moonlit Echoes' two theme colors when it's on, else SillyTavern's underline and quote
+   colors, so a pink-and-teal theme makes a pink-and-teal Stage. Moonlit Echoes styles much of the same with !important,
+   so the rules here that must win carry it too, behind a stronger selector. Teal is you and violet someone else, as
+   everywhere in the Engine. */
+
+body.wh-stage {
+    --whs-hot: var(--customThemeColor, var(--SmartThemeUnderlineColor, rgb(255, 45, 120)));
+    --whs-cool: var(--customThemeColor2, var(--SmartThemeQuoteColor, rgb(95, 224, 210)));
+    --whs-ink: var(--SmartThemeBodyColor, rgb(236, 230, 238));
+    --whs-ink-2: color-mix(in srgb, var(--whs-ink) 68%, transparent);
+    --whs-ink-3: color-mix(in srgb, var(--whs-ink) 44%, transparent);
+    --whs-base: var(--SmartThemeBlurTintColor, rgb(21, 18, 23));
+    --whs-glass: color-mix(in srgb, var(--whs-base) 76%, transparent);
+    --whs-glass-2: color-mix(in srgb, var(--whs-base) 97%, transparent);
+    --whs-hair: color-mix(in srgb, var(--whs-ink) 9%, transparent);
+    --whs-hair-2: color-mix(in srgb, var(--whs-ink) 16%, transparent);
+    --whs-hot-hair: color-mix(in srgb, var(--whs-hot) 42%, transparent);
+    --whs-hot-wash: color-mix(in srgb, var(--whs-hot) 12%, transparent);
+    --whs-you: 29, 158, 117;
+    --whs-npc: 127, 119, 221;
+    --whs-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.78), 0 2px 10px -4px rgba(0, 0, 0, 0.5);
+    --whs-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ------------------------------------------------------------------ the room: a soft light from above, dark edges */
+/* Sized from the top-left, never by inset or bottom: on phones the page's root carries a transform with no height,
+   which makes it what fixed things are placed against, so a bottom edge lands at the top of the screen. */
+#wh_stage_glow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(110% 60% at 50% -18%, color-mix(in srgb, var(--whs-hot) 17%, transparent), transparent 62%),
+        radial-gradient(80% 50% at 50% 118%, color-mix(in srgb, var(--whs-cool) 11%, transparent), transparent 62%),
+        radial-gradient(150% 120% at 50% 45%, transparent 52%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+/* ------------------------------------------------------------------ the top bar: glass, with a lit seam under it */
+body.wh-stage #top-bar {
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    border: 0 !important;
+}
+body.wh-stage #top-settings-holder {
+    background: var(--whs-glass) !important;
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    border-bottom: 0 !important;
+    box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.8);
+}
+body.wh-stage #top-settings-holder::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent 4%, var(--whs-hot-hair) 30%, color-mix(in srgb, var(--whs-cool) 45%, transparent) 70%, transparent 96%);
+}
+body.wh-stage .drawer-icon {
+    position: relative;
+    color: var(--whs-ink-2) !important;
+    transition: color 0.2s, filter 0.2s, transform 0.2s var(--whs-ease);
+}
+body.wh-stage .drawer-icon:hover { color: var(--whs-ink) !important; transform: translateY(-1px); }
+body.wh-stage .drawer-icon.openIcon {
+    color: var(--whs-hot) !important;
+    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--whs-hot) 70%, transparent));
+}
+body.wh-stage .drawer-icon.openIcon::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 3px;
+    width: 14px;
+    height: 2px;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    background: var(--whs-hot);
+    box-shadow: 0 0 8px var(--whs-hot);
+}
+
+/* ------------------------------------------------------------------ drawers and side panels: frosted, lit at the top */
+body.wh-stage .drawer-content,
+body.wh-stage #left-nav-panel,
+body.wh-stage #right-nav-panel {
+    background: var(--whs-glass-2) !important;
+    backdrop-filter: blur(20px) saturate(1.25);
+    -webkit-backdrop-filter: blur(20px) saturate(1.25);
+    border: 1px solid var(--whs-hair) !important;
+    border-top: 1px solid var(--whs-hot-hair) !important;
+    box-shadow: var(--whs-shadow) !important;
+}
+@media screen and (min-width: 1001px) {
+    body.wh-stage .drawer-content,
+    body.wh-stage #left-nav-panel,
+    body.wh-stage #right-nav-panel { border-radius: 0 0 18px 18px !important; }
+}
+body.wh-stage .inline-drawer-header {
+    background: color-mix(in srgb, var(--whs-ink) 4%, transparent) !important;
+    border: 1px solid var(--whs-hair) !important;
+    border-radius: 12px !important;
+    transition: background 0.2s, border-color 0.2s;
+}
+body.wh-stage .inline-drawer-header:hover {
+    background: var(--whs-hot-wash) !important;
+    border-color: var(--whs-hot-hair) !important;
+}
+body.wh-stage .drawer-content hr,
+body.wh-stage #right-nav-panel hr {
+    border: 0 !important;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--whs-hair-2), transparent) !important;
+}
+
+/* Buttons and fields, everywhere: soft pills, the theme's hot color on hover and focus. */
+body.wh-stage .menu_button {
+    border: 1px solid var(--whs-hair) !important;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--whs-ink) 5%, transparent) !important;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+body.wh-stage .menu_button:not(.disabled):hover,
+body.wh-stage .menu_button:not(.disabled).active,
+body.wh-stage .menu_button.toggleEnabled {
+    background: var(--whs-hot-wash) !important;
+    border-color: var(--whs-hot-hair) !important;
+}
+body.wh-stage .text_pole,
+body.wh-stage textarea.text_pole,
+body.wh-stage select.text_pole,
+body.wh-stage input.text_pole {
+    background-color: color-mix(in srgb, #000 24%, transparent) !important;
+    border: 1px solid var(--whs-hair) !important;
+    border-radius: 10px !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+body.wh-stage .text_pole:focus,
+body.wh-stage .text_pole:focus-visible {
+    border-color: var(--whs-hot-hair) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--whs-hot) 16%, transparent) !important;
+    outline: none !important;
+}
+body.wh-stage .character_select,
+body.wh-stage .group_select,
+body.wh-stage .bogus_folder_select {
+    border-radius: 12px;
+    transition: background 0.2s;
+}
+body.wh-stage .character_select:hover,
+body.wh-stage .group_select:hover,
+body.wh-stage .bogus_folder_select:hover { background: var(--whs-hot-wash) !important; }
+
+/* ------------------------------------------------------------------ the chat column: a glass stage */
+body.wh-stage #sheld::before {
+    content: '' !important;
+    position: absolute;
+    inset: 0;
+    z-index: -1 !important;
+    pointer-events: none;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--whs-base) 58%, transparent) 0%,
+        color-mix(in srgb, var(--whs-base) 82%, transparent) 26%,
+        color-mix(in srgb, var(--whs-base) 88%, transparent) 100%) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    box-shadow: inset 1px 0 0 var(--whs-hair), inset -1px 0 0 var(--whs-hair);
+}
+@media screen and (max-width: 1000px) {
+    body.wh-stage #sheld::before { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none; }
+}
+body.wh-stage #chat {
+    background: transparent !important;
+    backdrop-filter: none !important;
+}
+
+/* Messages: the story reads like a page, your lines sit in cards, and a faint seam runs between turns. */
+body.wh-stage #chat .mes {
+    position: relative;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 16px 8px 14px !important;
+}
+body.wh-stage #chat .mes + .mes::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14%;
+    right: 14%;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--whs-hair-2), transparent);
+}
+body.wh-stage #chat .mes .mes_block {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 4px !important;
+}
+body.wh-stage #chat .mes[is_user="true"] .mes_block {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--whs-hot) 10%, transparent), color-mix(in srgb, var(--whs-hot) 4%, transparent)) !important;
+    border: 1px solid color-mix(in srgb, var(--whs-hot) 22%, transparent) !important;
+    border-radius: 4px 16px 16px 16px !important;
+    padding: 9px 14px 8px !important;
+}
+body.wh-stage #chat .mes .ch_name .name_text {
+    font-variant: all-small-caps;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    font-size: 1.1em;
+    color: var(--whs-cool);
+}
+body.wh-stage #chat .mes[is_user="true"] .ch_name .name_text { color: var(--whs-hot); }
+body.wh-stage #chat .mes .timestamp,
+body.wh-stage #chat .mes .mesIDDisplay,
+body.wh-stage #chat .mes .mes_timer,
+body.wh-stage #chat .mes .tokenCounterDisplay {
+    color: var(--whs-ink-3) !important;
+    opacity: 1 !important;
+    letter-spacing: 0.02em;
+}
+body.wh-stage #chat .mes .mes_text { line-height: var(--messageLineHeight, 1.68); }
+body.wh-stage #chat .mes .mes_text hr {
+    border: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--whs-hot-hair), transparent);
+}
+/* Avatars in a ring of light: the theme's cool color for the story, its hot color for you. */
+body.wh-stage #chat .mes .avatar {
+    border: 0 !important;
+    border-radius: 50% !important;
+    padding: 2px;
+    box-sizing: border-box;
+    background: linear-gradient(140deg, var(--whs-cool), color-mix(in srgb, var(--whs-cool) 15%, transparent)) !important;
+    box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--whs-cool) 55%, transparent);
+}
+body.wh-stage #chat .mes[is_user="true"] .avatar {
+    background: linear-gradient(140deg, var(--whs-hot), color-mix(in srgb, var(--whs-hot) 15%, transparent)) !important;
+    box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--whs-hot) 55%, transparent);
+}
+body.wh-stage #chat .mes .avatar img {
+    border-radius: 50% !important;
+    border: 2px solid var(--whs-base) !important;
+    object-fit: cover;
+}
+body.wh-stage #chat .mes .mes_button,
+body.wh-stage #chat .mes .extraMesButtons > div { transition: opacity 0.2s, color 0.2s; }
+body.wh-stage #chat .mes .mes_button:hover,
+body.wh-stage #chat .swipe_left:hover,
+body.wh-stage #chat .swipe_right:hover { color: var(--whs-hot) !important; }
+
+/* The story's own lines: narration stays on the page; what someone says or does sits beside their face, under their
+   name (the Engine's picture, their card's avatar, or your persona's), with the rider's face small on a body someone
+   else is in. A reply no longer needs the card's picture beside it: the people in it carry their own. */
+/* The avatar column stays, empty (the reply's number and timing move up beside its time), and each speaker's face
+   hangs out into it, where the card's picture would be, with their words in line with the rest of the text. */
+body.wh-stage { --whs-av: calc(var(--custom-ChatAvatar, 40px) + 8px); }
+body.wh-stage #chat .mes[is_user="false"] .mesAvatarWrapper {
+    width: var(--whs-av) !important;
+    min-width: var(--whs-av) !important;
+    flex: none;
+    margin-right: 10px !important;
+    padding: 0 !important;
+}
+body.wh-stage #chat .mes[is_user="false"] .mesAvatarWrapper > * { display: none !important; }
+body.wh-stage #chat .mes[is_user="false"] .mes_block { padding-left: 4px !important; overflow: visible !important; }
+body.wh-stage #chat .mes_text .whs-say {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin: 12px 0 12px calc(-1 * (var(--whs-av) + 14px));
+}
+body.wh-stage #chat .mes_text .whs-say.whs-cont { margin-top: -4px; }
+.whs-say-face { position: relative; width: var(--whs-av); height: var(--whs-av); flex: none; }
+.whs-say-face .whs-pic { font-size: 17px; }
+.whs-say-npc .whs-say-face .whs-pic { border-color: rgb(var(--whs-npc)); }
+.whs-say-face .whs-rider { width: 20px; height: 20px; right: -4px; bottom: -4px; font-size: 9px; border-width: 1.5px; }
+.whs-cont .whs-say-face { visibility: hidden; height: 0; }
+.whs-say-bubble {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 14px 9px;
+    border-radius: 4px 16px 16px 16px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--whs-cool) 7%, transparent), color-mix(in srgb, var(--whs-ink) 3%, transparent));
+    border: 1px solid color-mix(in srgb, var(--whs-cool) 18%, transparent);
+}
+.whs-say-npc .whs-say-bubble {
+    background: linear-gradient(135deg, rgba(var(--whs-npc), 0.1), color-mix(in srgb, var(--whs-ink) 3%, transparent));
+    border-color: rgba(var(--whs-npc), 0.3);
+}
+/* Someone only doing something: their face and name, the page's own text, no speech bubble. */
+.whs-act .whs-say-bubble { background: none; border-color: transparent; padding: 2px 4px 2px 2px; }
+.whs-cont .whs-say-bubble { border-top-left-radius: 16px; }
+.whs-say-name {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    font-variant: all-small-caps;
+    color: var(--whs-cool);
+}
+.whs-say-npc .whs-say-name { color: color-mix(in srgb, rgb(var(--whs-npc)) 75%, #fff); }
+.whs-cont .whs-say-name { display: none; }
+body.wh-stage #chat .mes_text .whs-say-bubble p { margin: 0 !important; }
+.whs-say:not(.whs-act) .whs-say-bubble em { color: var(--whs-ink-2); }
+/* Where the reply happens, from the World notes: a scenario card's name gives way to it. */
+.whs-where {
+    margin-left: 8px;
+    font-variant: all-small-caps;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    font-size: 1.05em;
+    color: var(--whs-ink-2);
+    white-space: nowrap;
+}
+.whs-where i { color: var(--whs-hot); margin-right: 2px; font-size: 0.85em; }
+body.wh-stage #chat .mes.whs-scene-card.whs-placed .name_text { display: none !important; }
+body.wh-stage #chat .mes.whs-scene-card .whs-where { margin-left: 0; color: var(--whs-cool); }
+/* Your message as the body you were in, your own face small on it. */
+body.wh-stage #chat .mes .avatar { position: relative; }
+.whs-av-rider {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--whs-base);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.whs-av-rider .whs-pic { border: 0; font-size: 9px; }
+body.wh-stage #chat .mes .avatar .whs-av-rider img { border: 0 !important; border-radius: 0 !important; width: 100%; height: 100%; }
+/* The reply's number and how long it took, beside its time in the heading. */
+.whs-mid { margin-left: 8px; font-size: calc(var(--mainFontSize, 15px) * 0.72); color: var(--whs-ink-3); white-space: nowrap; letter-spacing: 0.02em; }
+
+/* Where the scene breaks (a new place, a new day, time gone by): a divider over the whole reply with the story's day
+   and time. The reply's own heading still names the place. */
+body.wh-stage #chat .mes .whs-scene {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 2px 0 14px calc(-1 * (var(--whs-av) + 14px));
+    color: var(--whs-ink-2);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    font-variant: all-small-caps;
+    white-space: nowrap;
+}
+.whs-scene-rule { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--whs-hot-hair), transparent); }
+.whs-scene-label { display: inline-flex; align-items: center; gap: 7px; padding: 3px 12px; border-radius: 999px; border: 1px solid var(--whs-hair-2);
+    background: color-mix(in srgb, var(--whs-hot) 6%, var(--whs-base)); font-size: 13px; }
+.whs-scene-label i { color: var(--whs-hot); font-size: 0.9em; }
+.whs-opening .whs-scene-label i { color: var(--whs-cool); }
+body.wh-stage #chat .mes:has(.whs-scene)::before { display: none; }
+
+/* A reply that comes as one scene per place: each place's heading drawn like a scene divider. */
+body.wh-stage .mes_text .custom-wh-place {
+    justify-content: center;
+    gap: 10px;
+    margin: 1.2em 0 0.7em;
+    padding: 0;
+    border: 0;
+    opacity: 1;
+    color: var(--whs-cool);
+    font-size: 0.78em;
+    letter-spacing: 0.14em;
+}
+body.wh-stage .mes_text .custom-wh-place::before,
+body.wh-stage .mes_text .custom-wh-place::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--whs-cool) 45%, transparent), transparent); opacity: 1; }
+
+/* Who a moment happened to, on its card's top edge across from its label: the rider's face, an arrow, the body's. */
+.mes_text .whs-moment-row {
+    position: absolute;
+    top: -0.95em;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    font-style: normal;
+}
+.whs-moment-cast {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px 2px 3px;
+    border-radius: 999px;
+    border: 1px solid rgba(var(--wh-mc, 178, 126, 255), 0.45);
+    background: linear-gradient(rgba(var(--wh-mc, 178, 126, 255), 0.14), rgba(var(--wh-mc, 178, 126, 255), 0.14)), var(--whs-base, var(--SmartThemeBlurTintColor, rgb(23, 23, 23)));
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--whs-ink, inherit);
+}
+.whs-moment-cast .whs-pic {
+    position: relative;
+    inset: auto;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    font-size: 9px;
+    border-width: 1.5px;
+}
+.whs-moment-cast.whs-you .whs-pic:first-child { border-color: rgb(var(--whs-you, 29, 158, 117)); }
+.whs-moment-cast i { opacity: 0.7; font-size: 10px; }
+.whs-moment-cast.whs-hidden { border-style: dashed; }
+.whs-mc-name { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+@media screen and (max-width: 1000px) {
+    .whs-mc-name { display: none; }
+    .whs-moment-cast { padding-right: 4px; }
+}
+
+/* Your lines for one body, while you run several: that body's face in its name. */
+body.wh-stage .mes_text .custom-wh-lane-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 0.65em 1px 2px;
+    line-height: 1.3;
+    vertical-align: middle;
+}
+.mes_text .custom-wh-lane-name .whs-lane-face {
+    position: relative;
+    inset: auto;
+    flex: none;
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    font-size: 9px;
+    line-height: 1;
+    border-width: 1.5px;
+    border-color: rgba(var(--wh-hue), 0.9);
+}
+
+/* ------------------------------------------------------------------ the message box: one floating bar */
+/* SillyTavern draws the bar's icons at 1.9 times the text size; in one slim bar that's oversized, so Stage takes them
+   to 1.3 (SillyTavern sizes the bar itself from the same value, so it follows). Moonlit Echoes' own sizes still win. */
+body.wh-stage { --bottomFormIconSize: calc(var(--mainFontSize) * 1.3); }
+body.wh-stage #send_form {
+    opacity: 1 !important;
+    background: var(--whs-glass) !important;
+    backdrop-filter: blur(16px) saturate(1.25);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+    border: 1px solid var(--whs-hair-2) !important;
+    border-radius: 18px !important;
+    box-shadow: var(--whs-shadow), inset 0 1px 0 color-mix(in srgb, var(--whs-ink) 6%, transparent);
+    transition: border-color 0.25s, box-shadow 0.25s;
+    margin-bottom: 10px !important;
+}
+body.wh-stage #send_form:focus-within {
+    border-color: var(--whs-hot-hair) !important;
+    box-shadow: var(--whs-shadow), 0 0 0 3px color-mix(in srgb, var(--whs-hot) 13%, transparent), 0 0 34px -10px color-mix(in srgb, var(--whs-hot) 50%, transparent);
+}
+body.wh-stage #send_textarea { background: transparent !important; }
+body.wh-stage #send_but,
+body.wh-stage #mes_continue,
+body.wh-stage #mes_stop { color: var(--whs-hot) !important; transition: filter 0.2s, transform 0.2s var(--whs-ease); }
+body.wh-stage #send_but:hover { filter: drop-shadow(0 0 8px var(--whs-hot)); transform: translateX(1px); }
+body.wh-stage #options_button,
+body.wh-stage #extensionsMenuButton { color: var(--whs-ink-2) !important; }
+body.wh-stage #options_button:hover,
+body.wh-stage #extensionsMenuButton:hover { color: var(--whs-ink) !important; }
+@media screen and (max-width: 1000px) {
+    body.wh-stage #send_form {
+        margin: 0 6px 6px !important;
+        border-radius: 16px !important;
+        border: 1px solid var(--whs-hair-2) !important;
+    }
+    body.wh-stage #send_form:focus-within { border: 1px solid var(--whs-hot-hair) !important; }
+}
+body.wh-stage #extensionsMenu,
+body.wh-stage .options-content,
+body.wh-stage .list-group {
+    background: var(--whs-glass-2) !important;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--whs-hair-2) !important;
+    border-radius: 14px !important;
+    box-shadow: var(--whs-shadow) !important;
+}
+
+/* ------------------------------------------------------------------ popups and toasts */
+body.wh-stage .popup {
+    background: var(--whs-glass-2) !important;
+    backdrop-filter: blur(22px) saturate(1.25);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    border: 1px solid var(--whs-hair-2) !important;
+    border-radius: 22px !important;
+    box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.88), inset 0 1px 0 color-mix(in srgb, var(--whs-hot) 32%, transparent) !important;
+}
+body.wh-stage .popup[open]::backdrop {
+    background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--whs-hot) 10%, transparent), rgba(0, 0, 0, 0.62) 70%) !important;
+}
+body.wh-stage .popup-controls .menu_button.popup-button-ok {
+    background: color-mix(in srgb, var(--whs-hot) 22%, transparent) !important;
+    border-color: var(--whs-hot-hair) !important;
+}
+@media screen and (max-width: 1000px) {
+    body.wh-stage .popup.large_dialogue_popup,
+    body.wh-stage .popup.wide_dialogue_popup { border-radius: 0 !important; }
+}
+body.wh-stage #toast-container > div {
+    background-color: var(--whs-glass-2) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    color: var(--whs-ink) !important;
+    border: 1px solid var(--whs-hair-2);
+    border-left: 3px solid var(--whs-hot);
+    border-radius: 14px !important;
+    box-shadow: var(--whs-shadow) !important;
+    opacity: 1 !important;
+}
+body.wh-stage #toast-container > .toast-success { border-left-color: var(--whs-cool); }
+body.wh-stage #toast-container > .toast-warning { border-left-color: #e0a43a; }
+body.wh-stage #toast-container > .toast-error { border-left-color: #e5484d; }
+
+/* ------------------------------------------------------------------ the band: the bodies strip, ready to pull down */
+body.wh-stage .wh-ledger-strip {
+    margin: 8px 4px 4px;
+    border-radius: 18px;
+    border: 1px solid var(--whs-hair-2);
+    background: var(--whs-glass);
+    box-shadow: var(--whs-shadow), inset 0 1px 0 color-mix(in srgb, var(--whs-ink) 6%, transparent);
+}
+body.wh-stage #wh_ledger_strip.wh-band {
+    touch-action: pan-x;
+    padding-bottom: 9px;
+    padding-right: 0;
+}
+body.wh-stage #wh_ledger_strip.wh-band::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 3px;
+    width: 34px;
+    height: 3px;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    background: var(--whs-hair-2);
+    transition: background 0.2s, width 0.2s var(--whs-ease);
+}
+body.wh-stage #wh_ledger_strip.wh-band:hover::after { background: var(--whs-hot-hair); width: 46px; }
+body.wh-stage .wh-ledger-strip .wh-strip-label { color: var(--whs-hot); opacity: 0.9; }
+body.wh-stage .wh-ledger-strip .wh-chip {
+    height: 38px;
+    border-radius: 19px;
+    border-color: var(--whs-hair-2);
+    background: color-mix(in srgb, var(--whs-ink) 4%, transparent);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.2s var(--whs-ease);
+}
+body.wh-stage .wh-ledger-strip .wh-chip:hover { transform: translateY(-1px); }
+body.wh-stage .wh-ledger-strip .wh-chip.wh-you { border-color: rgba(var(--whs-you), 0.95); background: rgba(var(--whs-you), 0.2); box-shadow: 0 0 18px -6px rgba(var(--whs-you), 0.8); }
+body.wh-stage .wh-ledger-strip .wh-chip.wh-npc { border-color: rgba(var(--whs-npc), 0.65); background: rgba(var(--whs-npc), 0.14); }
+body.wh-stage .wh-ledger-strip .wh-chip-face { width: 30px; height: 30px; }
+/* The rider's face, small, on the body they're in. */
+.wh-chip-lead { position: relative; display: inline-flex; flex: none; }
+.wh-chip-rider {
+    position: absolute;
+    right: -5px;
+    bottom: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1.5px solid var(--whs-base, rgb(21, 18, 23));
+    background: rgb(var(--whs-npc, 127, 119, 221));
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.wh-chip-rider.whs-you { background: rgb(var(--whs-you, 29, 158, 117)); }
+.wh-chip-rider.whs-hidden { border-style: dashed; }
+.wh-chip-rider img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; }
+/* The band's own buttons, kept in view at its right end while the chips scroll. */
+.wh-band-ctl {
+    position: sticky;
+    right: 0;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 0 8px 0 18px;
+    background: linear-gradient(90deg, transparent, var(--whs-base, var(--SmartThemeBlurTintColor, rgb(21, 18, 23))) 14px);
+}
+/* Outside Stage mode the strip only carries the masks that start it, quiet until hovered. */
+.wh-band-ctl-plain .wh-stage-start { border-color: transparent; opacity: 0.55; }
+.wh-band-ctl-plain .wh-stage-start:hover,
+.wh-band-ctl-plain .wh-stage-start:focus-visible { opacity: 1; }
+.wh-band-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    height: 32px;
+    min-width: 32px;
+    padding: 0 10px;
+    border-radius: 16px;
+    border: 1px solid var(--whs-hair-2, rgba(255, 255, 255, 0.16));
+    color: var(--whs-ink-2, inherit);
+    font-size: 13px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.wh-band-btn:hover,
+.wh-band-btn:focus-visible { color: var(--whs-ink, inherit); border-color: var(--whs-hot-hair, rgba(255, 255, 255, 0.4)); outline: none; }
+.wh-band-toggle i { transition: transform 0.3s var(--whs-ease, ease); }
+.wh-band.whs-open .wh-band-toggle { color: var(--whs-hot, inherit); border-color: var(--whs-hot-hair, currentColor); background: var(--whs-hot-wash, transparent); }
+.wh-band.whs-open .wh-band-toggle i { transform: rotate(180deg); }
+
+/* ------------------------------------------------------------------ the Board, pulled down over the top of the chat */
+#wh_stage_board {
+    position: absolute;
+    z-index: 40;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    max-height: min(66dvh, 600px);
+    /* Solid: with SillyTavern's blur off (or on a phone) there's nothing to frost the chat behind it. */
+    background: linear-gradient(180deg, color-mix(in srgb, var(--whs-hot) 7%, var(--whs-base)) 0%, var(--whs-base) 120px);
+    backdrop-filter: blur(24px) saturate(1.3);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    border: 1px solid var(--whs-hair-2);
+    border-radius: 22px;
+    box-shadow: 0 34px 90px -26px rgba(0, 0, 0, 0.9), inset 0 1px 0 color-mix(in srgb, var(--whs-hot) 30%, transparent);
+    color: var(--whs-ink);
+    transform-origin: top center;
+    animation: whs-drop 0.3s var(--whs-ease);
+}
+@keyframes whs-drop {
+    from { opacity: 0; transform: translateY(-12px) scaleY(0.96); }
+    to { opacity: 1; transform: none; }
+}
+body.reduced-motion #wh_stage_board { animation: none; }
+.whs-board-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 10px 4px 16px;
+}
+.whs-board-title {
+    white-space: nowrap;
+    font-variant: all-small-caps;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    font-size: 16px;
+}
+.whs-board-title i { color: var(--whs-hot); margin-right: 2px; }
+.whs-clock {
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--whs-hair);
+    color: var(--whs-ink-2);
+    font-size: 12.5px;
+    white-space: nowrap;
+}
+.whs-spacer { flex: 1; }
+.whs-head-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--whs-ink-2);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+}
+.whs-head-btn:hover,
+.whs-head-btn:focus-visible { color: var(--whs-ink); background: color-mix(in srgb, var(--whs-ink) 8%, transparent); outline: none; }
+.whs-head-btn.whs-on { color: var(--whs-cool); }
+.whs-board-body {
+    position: relative;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 8px 14px 14px;
+    scrollbar-width: none;
+}
+.whs-board-body::-webkit-scrollbar { display: none; }
+/* The lines run under the places and faces. */
+.whs-places {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.whs-place {
+    flex: 1 1 210px;
+    min-width: 0;
+    padding: 10px 12px 14px;
+    border-radius: 18px;
+    border: 1px solid var(--whs-hair);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--whs-ink) 5%, transparent), color-mix(in srgb, var(--whs-ink) 1.5%, transparent));
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.whs-place.whs-here {
+    border-color: rgba(var(--whs-you), 0.42);
+    background: linear-gradient(160deg, rgba(var(--whs-you), 0.1), rgba(var(--whs-you), 0.02));
+}
+.whs-place header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--whs-ink-2);
+}
+.whs-place header i { color: var(--whs-hot); }
+.whs-place.whs-here header i { color: rgb(var(--whs-you)); }
+.whs-place header span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whs-place header small { margin-left: auto; font-size: 11px; opacity: 0.6; }
+.whs-unplaced { border-style: dashed; background: transparent; }
+.whs-unplaced header i { color: var(--whs-ink-3); }
+.whs-cast { display: flex; flex-wrap: wrap; gap: 12px 10px; }
+.whs-person {
+    width: 78px;
+    padding: 4px 2px;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+.whs-person:focus-visible { outline: 2px solid var(--whs-hot); outline-offset: 2px; }
+.whs-person:hover .whs-face { transform: translateY(-2px); }
+.whs-person.whs-lifted { opacity: 0.3; }
+.whs-face {
+    position: relative;
+    width: 58px;
+    height: 58px;
+    flex: none;
+    transition: transform 0.2s var(--whs-ease);
+}
+.whs-pic {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 21px;
+    color: var(--whs-ink-2);
+    background: color-mix(in srgb, var(--whs-ink) 10%, var(--whs-base));
+    border: 2px solid var(--whs-hair-2);
+}
+.whs-pic img,
+.whs-rider img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; pointer-events: none; }
+.whs-k-you .whs-pic { border-color: rgb(var(--whs-you)); box-shadow: 0 0 0 3px rgba(var(--whs-you), 0.18), 0 0 24px -4px rgba(var(--whs-you), 0.75); }
+.whs-k-npc .whs-pic { border-color: rgb(var(--whs-npc)); box-shadow: 0 0 0 3px rgba(var(--whs-npc), 0.16); }
+/* An empty body, its owner's mind elsewhere or asleep: dimmed, in a broken ring. */
+.whs-k-idle .whs-pic { border-style: dashed; filter: saturate(0.5) brightness(0.78); }
+.whs-k-mind .whs-pic { border-style: dotted; }
+.whs-hidden .whs-pic { border-style: dashed; }
+.whs-rider {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    border: 2px solid var(--whs-base);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+}
+.whs-rider.whs-you { background: rgb(var(--whs-you)); }
+.whs-rider.whs-npc { background: rgb(var(--whs-npc)); }
+.whs-rider.whs-hidden { outline: 1.5px dashed var(--whs-ink-2); outline-offset: 1px; }
+.whs-marks { position: absolute; left: -5px; top: -5px; display: flex; gap: 2px; }
+.whs-mark {
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--whs-cool);
+    background: var(--whs-base);
+    border: 1px solid var(--whs-hair-2);
+}
+.whs-mark.whs-hid { color: var(--whs-ink-2); }
+.whs-person b {
+    max-width: 100%;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.whs-person small {
+    max-width: 100%;
+    font-size: 10.5px;
+    line-height: 1.2;
+    color: var(--whs-ink-3);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+/* New place: the footer turns into it while a face is being dragged, so nothing on the Board moves. */
+.whs-newplace {
+    display: none;
+    position: absolute;
+    inset: 2px 14px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 12px;
+    border: 1.5px dashed var(--whs-hot-hair);
+    color: var(--whs-hot);
+    font-size: 13px;
+}
+.whs-dragging .whs-newplace { display: flex; }
+.whs-dragging .whs-hint { visibility: hidden; }
+.whs-dragging .whs-place { border-style: dashed; }
+.whs-place.whs-drop,
+.whs-newplace.whs-drop {
+    border-color: var(--whs-hot) !important;
+    background: var(--whs-hot-wash) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--whs-hot) 16%, transparent);
+}
+.whs-ghost {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 99999;
+    width: 56px;
+    height: 56px;
+    pointer-events: none;
+    border-radius: 50%;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--whs-hot, #ff2d78);
+}
+.whs-ghost .whs-pic { border: 0; }
+.whs-lines { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.whs-line { fill: none; stroke-width: 2; stroke-linecap: round; opacity: 0.85; }
+.whs-line.whs-you { stroke: rgb(var(--whs-you)); filter: drop-shadow(0 0 4px rgba(var(--whs-you), 0.7)); }
+.whs-line.whs-npc { stroke: rgb(var(--whs-npc)); }
+.whs-line.whs-hidden { stroke-dasharray: 5 6; opacity: 0.6; filter: none; }
+.whs-line-flow { fill: none; stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 0.5 16; animation: whs-flow 1.4s linear infinite; }
+.whs-line-flow.whs-you { stroke: color-mix(in srgb, rgb(var(--whs-you)) 40%, #fff); }
+.whs-line-flow.whs-npc { stroke: color-mix(in srgb, rgb(var(--whs-npc)) 40%, #fff); }
+@keyframes whs-flow { to { stroke-dashoffset: -33; } }
+.whs-board-foot {
+    position: relative;
+    flex: none;
+    height: 30px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--whs-ink-3);
+}
+.whs-hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whs-hint-short { display: none; }
+.whs-grab {
+    height: 18px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: ns-resize;
+    touch-action: none;
+}
+.whs-grab::before { content: ''; width: 38px; height: 4px; border-radius: 2px; background: var(--whs-hair-2); transition: background 0.2s; }
+.whs-grab:hover::before { background: var(--whs-hot-hair); }
+.whs-empty { padding: 22px 12px; text-align: center; color: var(--whs-ink-3); font-size: 13px; }
+
+@media screen and (max-width: 1000px) {
+    #wh_stage_board { left: 4px; right: 4px; max-height: 72dvh; border-radius: 18px; }
+    .whs-board-body { padding: 6px 10px 10px; }
+    .whs-place { flex-basis: 140px; padding: 9px 9px 11px; }
+    .whs-person { width: 66px; }
+    .whs-face { width: 48px; height: 48px; }
+    .whs-pic { font-size: 18px; }
+    .whs-rider { width: 22px; height: 22px; font-size: 10px; }
+    .whs-clock { font-size: 11.5px; padding: 2px 8px; }
+    .whs-hint-long { display: none; }
+    .whs-hint-short { display: inline; }
+}
+
+/* ------------------------------------------------------------------ sheets: the Body Ledger and the Mind Book */
+.whs-sheet {
+    position: fixed;
+    z-index: 900;
+    top: calc(var(--topBarBlockSize, 36px) + 12px);
+    right: 14px;
+    height: calc(100dvh - var(--topBarBlockSize, 36px) - 26px);
+    width: clamp(320px, calc((100vw - var(--sheldWidth, 50vw)) / 2 - 28px), 560px);
+    display: flex;
+    flex-direction: column;
+    color: var(--whs-ink);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--whs-hot) 6%, var(--whs-base)) 0%, var(--whs-base) 140px);
+    border: 1px solid var(--whs-hair-2);
+    border-radius: 22px;
+    box-shadow: 0 34px 90px -26px rgba(0, 0, 0, 0.9), inset 0 1px 0 color-mix(in srgb, var(--whs-hot) 30%, transparent);
+    outline: none;
+    animation: whs-sheet-side 0.26s var(--whs-ease);
+}
+@keyframes whs-sheet-side { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+.whs-sheet.whs-leaving { opacity: 0; transform: translateX(18px); transition: opacity 0.18s, transform 0.18s; }
+.whs-sheet-back { display: none; }
+.whs-sheet-grab { display: none; }
+.whs-sheet-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 10px 8px 12px;
+    border-bottom: 1px solid var(--whs-hair);
+}
+.whs-sheet-tabs { display: flex; gap: 4px; min-width: 0; }
+.whs-sheet-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 13px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    color: var(--whs-ink-2);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    font-variant: all-small-caps;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.whs-sheet-tab i { color: var(--whs-hot); opacity: 0.85; }
+.whs-sheet-tab:hover,
+.whs-sheet-tab:focus-visible { color: var(--whs-ink); background: color-mix(in srgb, var(--whs-ink) 6%, transparent); outline: none; }
+.whs-sheet-tab.whs-on { color: var(--whs-ink); border-color: var(--whs-hot-hair); background: var(--whs-hot-wash); }
+.whs-sheet-tabs.whs-one .whs-sheet-tab { cursor: default; border-color: transparent; background: none; font-size: 15px; letter-spacing: 0.12em; }
+.whs-sheet-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 12px 14px 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--whs-hot-hair) transparent;
+}
+/* The book's own title and explainer are the sheet's tabs now; its buttons (Draw missing pictures) stay. */
+.whs-sheet .wh-dos .wh-dos-head { border-bottom: 0; padding-bottom: 0; justify-content: flex-end; }
+.whs-sheet .wh-dos .wh-dos-head-text { display: none; }
+.whs-sheet .wh-dos .wh-dos-head:not(:has(> :not(.wh-dos-head-text))) { display: none; }
+.whs-sheet .wh-dos { gap: 12px; }
+
+@media screen and (max-width: 1000px) {
+    .whs-sheet {
+        top: 12dvh;
+        left: 0;
+        right: auto;
+        width: 100vw;
+        height: 88dvh;
+        border-radius: 22px 22px 0 0;
+        border-bottom: 0;
+        animation: whs-sheet-up 0.28s var(--whs-ease);
+        touch-action: pan-y;
+    }
+    @keyframes whs-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+    .whs-sheet.whs-leaving { transform: translateY(100%); opacity: 1; transition: transform 0.2s; }
+    .whs-sheet-back {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100dvh;
+        z-index: 899;
+        background: rgba(0, 0, 0, 0.5);
+        animation: whs-fade 0.25s;
+    }
+    @keyframes whs-fade { from { opacity: 0; } }
+    .whs-sheet-grab { display: flex; justify-content: center; padding: 8px 0 0; touch-action: none; }
+    .whs-sheet-grab::before { content: ''; width: 40px; height: 4px; border-radius: 2px; background: var(--whs-hair-2); }
+    .whs-sheet-head { padding-top: 4px; touch-action: none; }
+    .whs-sheet-body { padding: 10px 12px calc(16px + env(safe-area-inset-bottom, 0px)); }
+}
+body.reduced-motion .whs-sheet,
+body.reduced-motion .whs-sheet-back { animation: none; }
+body.reduced-motion .whs-sheet.whs-leaving { transition: none; }

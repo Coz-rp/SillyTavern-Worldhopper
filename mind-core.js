@@ -8,6 +8,9 @@
 //   control     per will: who it's on (one person or several), the controller, what was set (the update answers with
 //               the whole current will, so a newer setting simply replaces an older one), what is still their own.
 //   perception  per edit: what it is, its kind (unseen / normal / false), who has it (names, or everyone but…).
+//   influence   per change that builds over time (only for a card whose "Change that builds" rule is set, whatever its
+//               modes): who it changes, what it changes, what they were like before, by whom, how many times it's
+//               been done and when last. The code counts and decides when it holds; the model only says "again".
 // Bodies never appear here; who is in which body is the Ledger's.
 //
 // Each mode's record is updated by its own small prompt, and only on replies that need it (a marked moment, someone
@@ -16,11 +19,16 @@
 // someone who can't perceive a person who is right there.
 
 export const MIND_MODES = { hypnosis: 'Hypnosis', control: 'Mind Control', perception: 'Altered Perception' };
-export const KINDS = /** @type {const} */ (['hypnosis', 'control', 'perception']);
+export const KINDS = /** @type {const} */ (['hypnosis', 'control', 'perception', 'influence']);
 export const STAGES = ['awake', 'light', 'medium', 'deep', 'somnambulistic'];
 export const WILL_KINDS = ['wants', 'feels', 'believes', 'loyal to', 'command'];
 export const EDIT_KINDS = ['unseen', 'normal', 'false'];
-export const EMPTY_BOOK = Object.freeze({ hypnosis: [], control: [], perception: [] });
+export const EMPTY_BOOK = Object.freeze({ hypnosis: [], control: [], perception: [], influence: [] });
+// On a card where change fades, a change left alone slips back one time for every FADE_DAYS of story time without being
+// renewed, by the World notes' clock; in a chat with no clock (no body mode, or a story that never says when it is),
+// for every FADE_EVERY messages instead.
+export const FADE_DAYS = 3;
+export const FADE_EVERY = 40;
 
 const str = (v, n = 160) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const listOf = v => Array.isArray(v) ? v : v == null || v === '' ? [] : [v];
@@ -90,6 +98,20 @@ function normEdit(e, i) {
     };
 }
 
+function normChange(c, i) {
+    return {
+        id: str(c?.id, 8) || `i${i + 1}`,
+        who: str(c?.who, 60),
+        what: str(c?.what, 220),
+        from: str(c?.from, 160),
+        by: str(c?.by, 60),
+        times: Math.max(0, Math.min(999, parseInt(c?.times, 10) || 0)),
+        last: Math.max(0, parseInt(c?.last, 10) || 0),
+        lastTime: Number.isFinite(parseInt(c?.lastTime, 10)) ? Math.max(-1, parseInt(c.lastTime, 10)) : -1,   // story minutes; -1: no clock
+        user_knows: no(c?.user_knows) ? 'no' : 'yes',
+    };
+}
+
 /** Ids stay unique when entries are added: a clash or a gap gets the next free number. */
 function renumber(list, prefix) {
     const seen = new Set();
@@ -108,28 +130,78 @@ export function normalizeBook(raw) {
         hypnosis: hyp.slice(0, 24),
         control: renumber(listOf(raw?.control).map(normWill).filter(w => w.who.length && (w.set.length || w.own)), 'c').slice(0, 24),
         perception: renumber(listOf(raw?.perception).map(normEdit).filter(e => e.what && (e.who.length || e.everyone)), 'p').slice(0, 24),
+        influence: renumber(listOf(raw?.influence).map(normChange).filter(c => c.who && c.what), 'i').slice(0, 24),
     };
+}
+
+/**
+ * How many times a change counts for now: where change fades, one fewer for every FADE_DAYS of story time since it was
+ * last renewed (`time`: the story clock's elapsed minutes now, -1 for none), or, without a clock on both ends, for
+ * every FADE_EVERY messages (`at`: the message the book is being read at). 0 means it has faded away.
+ */
+export function influenceNow(c, { at = 0, fades = false, time = -1 } = {}) {
+    if (!fades) return c.times;
+    if (time >= 0 && c.lastTime >= 0) return Math.max(0, c.times - Math.floor(Math.max(0, time - c.lastTime) / (FADE_DAYS * 1440)));
+    if (!(at > c.last)) return c.times;
+    return Math.max(0, c.times - Math.floor((at - c.last) / FADE_EVERY));
 }
 
 export const isEmptyBook = b => !b || KINDS.every(k => !listOf(b[k]).length);
 
 // ------------------------------------------------------------------ when to update
 
+// Stories rarely say "trance" or "edit": an induction is a swinging crystal and heavy eyelids, a lifted edit is a woman
+// who "reappears to their senses". The Gym's hypnosis, control and perception stories showed which words they use.
 const WORDS = {
-    hypnosis: /%%trance%%|\b(trance\w*|hypno\w*|induc(e|ed|es|ing|tion|tions)\b|deepen\w*|deeper and deeper|suggestion\w*|trigger\w*|pendulum|fractionat\w*|conditioning|post-hypnotic|awaken\w*|wake up|wakes up|snaps? (?:her|his|their|my|your) fingers|count(?:s|ed|ing)? (?:down|back)|go(?:ing|es)? under|went under|sink(?:ing|s)? deeper)/i,
-    control: /%%control%%|\b(command(?:s|ed)?|obey\w*|compel\w*|your will|my will|(?:his|her|their) will|bend\w* to|mind control\w*|controll(?:ed|ing)|loyal\w*|devot\w*|from now on|you want to|let(?:s|ting)? go of|releas(?:e|es|ed|ing)|resist\w*|fight(?:s|ing)? (?:it|back|the control)|struggl\w+ against|break(?:s|ing)? free|snap(?:s|ped)? out of|(?:her|his|their|your|my) mind|free(?:d|s)? (?:her|him|them|you))\b/i,
-    perception: /\b((?:can|could)(?:'?t|not)? (?:see|hear|perceive|notice)|(?:doesn'?t|don'?t|didn'?t|won'?t) (?:see|hear|notice)|invisible|unseen|unnoticed|perceiv\w*|perception|always been|perfectly normal|completely normal|totally normal|nothing strange|rewrit\w+|(?:edit|chang)(?:ed|es|ing)? (?:her|his|their|your) (?:mind|memory|memories|reality|perception))\b/i,
+    hypnosis: /%%trance%%|\b(trance\w*|hypno\w*|induc(e|ed|es|ing|tion|tions)\b|deepen\w*|deeper and deeper|suggestion\w*|trigger\w*|pendulum|fractionat\w*|conditioning|post-hypnotic|awaken\w*|wake up|wakes up|snaps? (?:her|his|their|my|your) fingers|count(?:s|ed|ing)? (?:down|back)|go(?:ing|es)? under|went under|sink(?:ing|s)? deeper|back and forth|eyelids?|breath(?:e|es|ing)? (?:in|out|slow\w*)|my voice|watch(?:es|ing)? (?:it|the \w+|my \w+) (?:go|move|swing|turn|fall)\w*)\b/i,
+    control: /%%control%%|\b(command(?:s|ed)?|obey\w*|compel\w*|your will|my will|(?:his|her|their) will|bend\w* to|mind control\w*|controll(?:ed|ing)|loyal\w*|devot\w*|from now on|you want to|let(?:s|ting)? go of|releas(?:e|es|ed|ing)|resist\w*|fight(?:s|ing)? (?:it|back|the control)|struggl\w+ against|break(?:s|ing)? free|snap(?:s|ped)? out of|(?:\w+['’]s|her|his|their|your|my) mind|free(?:d|s)? (?:her|him|them|you))\b/i,
+    perception: /\b((?:can|could)(?:'?t|not)? (?:see|hear|perceive|notice)|(?:doesn'?t|don'?t|didn'?t|won'?t) (?:see|hear|notice)|invisib\w*|unseen|unnoticed|perceiv\w*|perception|always been|perfectly normal|completely normal|totally normal|nothing strange|rewrit\w+|(?:edit|chang)(?:ed|es|ing)? (?:her|his|their|your) (?:mind|memory|memories|reality|perception)|edit(?:s|ed|ing)?|reappear\w*|veil\w*|illusion\w*|senses|(?:look|looks|looked|looking|stare|stares|stared|staring|gaze|gazes|eyes) (?:\w+ ){0,2}through|(?:eyes|gaze|glance)s? (?:\w+ )?slid(?:e|es|ing)? (?:\w+ )?(?:off|past|over))\b/i,
 };
 
-/** True when the new messages give this mode's record something to do. */
+/**
+ * One Mind Book update, exactly as the extension runs it after a reply: each picked kind whose record the new messages
+ * touch (every kind, on the first read) gets its own call, and the answers apply in turn. An answer that can't be read
+ * is asked once more with room, since a model that thinks first can run out partway. `ask(messages, maxTokens)` returns
+ * the model's text; an error from it is thrown. `at` is the message being read (when a change was last renewed) and
+ * `fades` whether change fades on this card. Returns { book, ran } (ran: how many calls were made).
+ */
+export async function mindStep({ book = null, messages, context = [], userName = 'the player', kinds = [], card = '', at = 0, fades = false, time = -1 }, ask) {
+    const first = !book;
+    let b = book || EMPTY_BOOK;
+    const text = messages.map(m => m.text).join('\n');
+    let ran = 0;
+    for (const kind of kinds) {
+        if (!first && !needsUpdate(kind, b, text)) continue;
+        const msgs = buildMindMessages(kind, { book: b, messages, context, userName, card: first ? card : '' });
+        let next = applyMindUpdate(kind, b, await ask(msgs, 700), { at, fades, time });
+        if (!next) next = applyMindUpdate(kind, b, await ask(msgs, 4000), { at, fades, time });
+        ran++;
+        if (next) b = next;
+    }
+    return { book: b, ran };
+}
+
+/**
+ * True when the new messages give this mode's record something to do: its words, or (like anyone still in trance) a
+ * person the record already holds showing up, since a controlled man who "keeps thinking he should" or an unseen woman
+ * people "make room for" has moved on without any of the words.
+ */
 export function needsUpdate(kind, book, text) {
     const t = String(text || '');
+    // Change over time reads every reply on the cards that turn it on: a power is used the card's own way ("hums a few
+    // low notes"), with none of the words, and a new change has no one in the record yet (the Gym's first run missed 11
+    // of 35 first uses behind the gate, 2026-10-28).
+    if (kind === 'influence') return true;
     if (WORDS[kind]?.test(t)) return true;
+    const b = normalizeBook(book);
     if (kind === 'hypnosis') {
-        const b = normalizeBook(book);
         if (b.hypnosis.some(h => h.now !== 'awake')) return true;
         if (b.hypnosis.some(h => h.triggers.some(tr => cueRe(tr.cue).test(t)))) return true;
     }
+    const seen = names => names.some(n => nameIn(t, [n]) || firstNameIn(t, n));
+    if (kind === 'control') return b.control.some(w => seen(w.who));
+    if (kind === 'perception') return b.perception.some(e => seen([e.target, ...e.who].filter(Boolean)));
+    if (kind === 'influence') return b.influence.some(c => seen([c.who]));
     return false;
 }
 
@@ -194,7 +266,22 @@ Each edit holds:
 Answer with ONLY edits that are new or changed, each WHOLE, in this shape:
 {"perception":[{"id":"","what":"","kind":"","target":"","who":[""],"everyone":false,"except":[""],"by":"","undone":false,"user_knows":"yes"}]}
 ${SHARED(userName)}`,
+    influence: userName => `You keep the record of change that builds over time in an adult roleplay: something a power works into a person a little more each time it's used on them, until it holds on its own. The card says how fast it builds; you only follow what happens, and the counting is done for you.
+Each change holds:
+- id: keep the id of a change you update; leave it out for a new one;
+- who: the person it changes;
+- what: the change in plain words, as what it makes them feel, want, believe, do or be (not how it's done);
+- from: what they were like before it started, if the card or story says;
+- by: who or what is changing them;
+- again: true only when the new messages show the power used on them once more for this change: the act itself (another session, ride, dose, touch or lesson that works it in). Someone acting on the change, showing it, feeling it or talking about it is not again, and neither is anything done without the power. A change that first appears in the new messages is new: leave again out;
+- undone: true when the change is reversed entirely;
+- user_knows.
+A change is a lasting shift in who someone is. A one-off order, a single moment, or a passing mood is not one. Hypnotic suggestions, mind-control settings and perception edits have records of their own: leave them out.
+Answer with ONLY changes that are new or worked on again, each WHOLE, in this shape:
+{"influence":[{"id":"","who":"","what":"","from":"","by":"","again":false,"undone":false,"user_knows":"yes"}]}
+${SHARED(userName)}`,
 };
+const ANSWER_WITH = { hypnosis: 'people', control: 'entries', perception: 'edits', influence: 'changes' };
 
 /**
  * Messages for one mode's update. `book` is the whole Mind Book (only this mode's part is shown), `messages` the new
@@ -205,28 +292,34 @@ export function buildMindMessages(kind, { book, messages, context = [], userName
     const fmt = list => list.map(m => `${m.name}: ${m.text}`).join('\n\n');
     const parts = [];
     if (card) parts.push(`Character card:\n<<<\n${String(card).slice(0, 5000)}\n>>>`);
-    parts.push(`The record so far:\n${JSON.stringify({ [kind]: b[kind] })}`);
+    // The counts are the code's, so the model never sees them to copy or bump.
+    const shown = kind === 'influence' ? b.influence.map(({ times, last, ...c }) => c) : b[kind];
+    parts.push(`The record so far:\n${JSON.stringify({ [kind]: shown })}`);
     if (context.length) parts.push(`Earlier (already in the record):\n<<<\n${fmt(context)}\n>>>`);
     parts.push(`New messages:\n<<<\n${fmt(messages)}\n>>>`);
-    parts.push(`Answer with the changed ${kind === 'perception' ? 'edits' : kind === 'control' ? 'entries' : 'people'} as JSON, or {} if nothing changed.`);
+    parts.push(`Answer with the changed ${ANSWER_WITH[kind]} as JSON, or {} if nothing changed.`);
     return [
         { role: 'system', content: PROMPTS[kind](userName) },
         { role: 'user', content: parts.join('\n\n') },
     ];
 }
 
-/** The first JSON object in a reply, or null. */
+/**
+ * The first JSON object in a reply, or null. One that never closes is an answer cut off partway: null, so it's asked
+ * again with room, rather than a complete piece from inside it read as the answer.
+ */
 function firstJson(text) {
     const r = String(text || '');
     for (let n = r.indexOf('{'); n >= 0; n = r.indexOf('{', n + 1)) {
-        let depth = 0, inStr = false;
+        let depth = 0, inStr = false, closed = false;
         for (let i = n; i < r.length; i++) {
             const ch = r[i];
             if (inStr) { if (ch === '\\') i++; else if (ch === '"') inStr = false; continue; }
             if (ch === '"') inStr = true;
             else if (ch === '{') depth++;
-            else if (ch === '}' && --depth === 0) { try { return JSON.parse(r.slice(n, i + 1)); } catch { break; } }
+            else if (ch === '}' && --depth === 0) { closed = true; try { return JSON.parse(r.slice(n, i + 1)); } catch { break; } }
         }
+        if (!closed) return null;
     }
     return null;
 }
@@ -234,14 +327,41 @@ function firstJson(text) {
 /**
  * Apply one mode's answer to the book. Returns the new book, or null when the answer can't be read. Counting is
  * done here, never by the model: times under goes up when someone goes under from awake, the deepest stage only
- * ever goes deeper, and a suggestion planted again counts as reinforced.
+ * ever goes deeper, a suggestion planted again counts as reinforced, and a change worked on again counts one more time
+ * (from where fading has left it, `at` being this message), while one that has faded away is dropped.
  */
-export function applyMindUpdate(kind, book, answer) {
+export function applyMindUpdate(kind, book, answer, { at = 0, fades = false, time = -1 } = {}) {
     const prev = normalizeBook(book);
     const raw = firstJson(answer);
     if (!raw) return /^\s*(\{\s*\}|none|no changes?\.?)\s*$/i.test(String(answer || '')) ? prev : null;
+    // Something without this record's list isn't an answer (a piece of one): unreadable, so it's asked again.
+    if (!Array.isArray(raw) && Object.keys(raw).length && !(kind in raw)) return null;
     const items = listOf(raw[kind] ?? (Array.isArray(raw) ? raw : []));
     const next = { ...prev, [kind]: [...prev[kind]] };
+
+    if (kind === 'influence') {
+        const bumped = new Set();   // one more time per change per update, however often an answer lists it
+        for (const it of items) {
+            const id = str(it?.id, 8);
+            let i = id ? next.influence.findIndex(c => c.id === id) : -1;
+            if (i < 0) i = next.influence.findIndex(c => same(c.who, it?.who) && canon(c.what) === canon(it?.what));
+            if (yes(it?.undone)) { if (i >= 0) next.influence.splice(i, 1); continue; }
+            const n = normChange(it, next.influence.length);
+            if (!n.who || !n.what) continue;
+            if (i >= 0) {
+                const old = next.influence[i];
+                const again = yes(it?.again) && !bumped.has(old.id);
+                if (again) bumped.add(old.id);
+                next.influence[i] = {
+                    ...n, id: old.id, from: n.from || old.from, by: n.by || old.by,
+                    times: again ? influenceNow(old, { at, fades, time }) + 1 : old.times, last: again ? at : old.last, lastTime: again && time >= 0 ? time : old.lastTime,
+                    user_knows: old.user_knows === 'yes' ? 'yes' : n.user_knows,
+                };
+            } else next.influence.push({ ...n, id: '', times: 1, last: at, lastTime: time });
+        }
+        next.influence = next.influence.filter(c => influenceNow(c, { at, fades, time }) > 0);
+        return normalizeBook(next);
+    }
 
     if (kind === 'hypnosis') {
         for (const it of items) {
@@ -253,8 +373,11 @@ export function applyMindUpdate(kind, book, answer) {
             if (!stageOf(it?.now)) merged.now = old.now;   // no stage given: unchanged
             if (!str(it?.by)) merged.by = old.by;
             if (!n.susceptibility) merged.susceptibility = old.susceptibility;
-            if (!('suggestions' in (it || {}))) merged.suggestions = old.suggestions;
-            if (!('triggers' in (it || {}))) merged.triggers = old.triggers;
+            // The record comes back whole, so a suggestion or trigger left out was removed. An empty list is different:
+            // it is nearly always the answer template echoed back on a turn about something else (a wake-up, a
+            // trigger firing), and taking it at its word wiped everything planted.
+            if (!('suggestions' in (it || {})) || (!n.suggestions.length && old.suggestions.length)) merged.suggestions = old.suggestions;
+            if (!('triggers' in (it || {})) || (!n.triggers.length && old.triggers.length)) merged.triggers = old.triggers;
             if (old.user_knows === 'yes') merged.user_knows = 'yes';
             if (it?.amnesia === undefined) merged.amnesia = old.amnesia;
             // Going under from awake is one more time under, whether or not the model said so (and a session that
@@ -330,7 +453,8 @@ function nameIn(text, names) {
     return names.filter(Boolean).some(n => new RegExp(`(?<![\\p{L}\\p{N}])${String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu').test(t));
 }
 
-function subjectLine(h, userName) {
+// holds: on a card where change builds, a suggestion lasts once it's been planted that many times (else 3).
+function subjectLine(h, userName, holds = 0) {
     // Rapid induction works only on a conditioned or highly susceptible subject.
     const conditioned = h.times >= 3 || rank(h.deepest) >= rank('deep') || h.susceptibility === 'high';
     const by = h.by ? ` (hypnotized by ${h.by})` : '';
@@ -342,7 +466,7 @@ function subjectLine(h, userName) {
             : `Awake. A first induction takes patience (a long relaxation, or fixation on one point)${conditioned ? ', though a rapid one can work on someone this susceptible.' : ', and a rapid induction won\'t work yet.'}`)
         : `In ${STAGE_LINE[h.now]}.`;
     const sugg = h.suggestions.map(s => {
-        const lasts = s.times >= 3 ? 'lasting, reinforced' : LASTS[s.stage] || 'for now';
+        const lasts = s.times >= (holds || 3) ? 'lasting, reinforced' : LASTS[s.stage] || 'for now';
         const mem = h.amnesia === 'yes' ? 'not remembered' : REMEMBERS[s.stage] || 'remembered';
         return `${bare(s.text)} (${lasts}; receiving it ${mem})`;
     });
@@ -373,6 +497,29 @@ function willLine(w, userName) {
     }
     if (w.who.some(x => isPlayer(x, userName))) out.push(`  ${userName} is the player: write the changed behavior, and leave ${userName}'s inner experience to the player.`);
     if (w.user_knows === 'no') out.push(`  ${userName} doesn't know about this: narration shows only what ${userName} could notice.`);
+    return out.join('\n');
+}
+
+/**
+ * Where a change stands, from the counts alone: started (once, a nudge), taking hold (still fresh, pushes back if
+ * leaned on too hard), or holding on its own; and slipping back when fading has taken some of it.
+ */
+export function changeStage(c, { holds = 4, at = 0, fades = false, time = -1 } = {}) {
+    const now = influenceNow(c, { at, fades, time });
+    return { now, stage: now >= holds ? 'holds' : now <= 1 ? 'started' : 'growing', slipping: now < c.times };
+}
+
+function changeLine(c, userName, pace) {
+    const { now, stage, slipping } = changeStage(c, pace);
+    const w = c.who;
+    const state = stage === 'holds'
+        ? `It holds on its own now: ${w} treats it as who ${w} has always been and gives reasons of ${w}'s own for it.`
+        : stage === 'started'
+            ? `Done once so far: a nudge ${w} can shrug off. It shows only in small ways, and ${w} doesn't think of it as a change.`
+            : `${now} of the ${pace.holds} times it takes to hold: taking hold but still fresh. ${w} acts on it now and then, a little surprised by it, and leaning on it too hard too soon makes ${w} balk.`;
+    const out = [`- ${w}: ${bare(c.what)}${c.from ? ` (before: ${bare(c.from)})` : ''}${c.by ? `, by ${c.by}` : ''}. ${state}${slipping ? ' Not renewed in a while, it has slipped back a step.' : ''}`];
+    if (isPlayer(w, userName)) out.push(`  ${w} is the player: write what the change does to ${w}'s behavior, and leave ${w}'s inner experience to the player.`);
+    if (c.user_knows === 'no') out.push(`  ${userName} doesn't know about this: narration shows only what ${userName} could notice.`);
     return out.join('\n');
 }
 
@@ -422,23 +569,29 @@ export function watchLines(book, { latest = '', recent = '', userName = 'the pla
 // scene: the last few messages. Given, only the people in the scene (named there, or in a trance right now; an edit
 // everyone has always counts) get their full entry; everyone else gets a name on one short line, and their full entry
 // comes back once they're in a scene again. Left out (the /wh-mind readout), every entry is in full.
-export function renderMindBook(book, userName = 'the player', { kinds = KINDS, latest = '', recent = '', scene = null } = {}) {
+// holds, fades, at, time: the card's change pace, the message being written after, and the story clock (see changeStage).
+export function renderMindBook(book, userName = 'the player', { kinds = KINDS, latest = '', recent = '', scene = null, holds = 0, fades = false, at = 0, time = -1 } = {}) {
     const b = normalizeBook(book);
     const named = names => scene == null || names.some(n => nameIn(scene, [n]) || firstNameIn(scene, n));
+    const pace = { holds: holds || 4, fades, at, time };
+    const changes = b.influence.filter(c => influenceNow(c, pace) > 0);
     const here = {
         hypnosis: b.hypnosis.filter(h => h.now !== 'awake' || named([h.who])),
         control: b.control.filter(w => named(w.who)),
         perception: b.perception.filter(e => e.everyone || named([...e.who, e.target])),
+        influence: changes.filter(c => named([c.who])),
     };
     const away = [
         ...(kinds.includes('hypnosis') ? b.hypnosis.filter(h => !here.hypnosis.includes(h)).map(h => `${h.who} (hypnotized${h.by ? ` by ${h.by}` : ''})`) : []),
         ...(kinds.includes('control') ? b.control.filter(w => !here.control.includes(w)).map(w => `${join(w.who)} (controlled${w.by ? ` by ${w.by}` : ''})`) : []),
         ...(kinds.includes('perception') ? b.perception.filter(e => !here.perception.includes(e)).map(e => `${join(e.who)} (altered perception)`) : []),
+        ...(kinds.includes('influence') ? changes.filter(c => !here.influence.includes(c)).map(c => `${c.who} (changing over time)`) : []),
     ];
     const parts = [];
-    if (kinds.includes('hypnosis') && here.hypnosis.length) parts.push('Hypnosis (realistic: patience, stages, repetition):', ...here.hypnosis.map(h => subjectLine(h, userName)));
+    if (kinds.includes('hypnosis') && here.hypnosis.length) parts.push('Hypnosis (realistic: patience, stages, repetition):', ...here.hypnosis.map(h => subjectLine(h, userName, holds)));
     if (kinds.includes('control') && here.control.length) parts.push('Mind control:', ...here.control.map(w => willLine(w, userName)));
     if (kinds.includes('perception') && here.perception.length) parts.push('Altered perception:', ...here.perception.map(e => editLine(e, userName)));
+    if (kinds.includes('influence') && here.influence.length) parts.push('Change building over time (counted, not guessed):', ...here.influence.map(c => changeLine(c, userName, pace)));
     if (away.length) parts.push(`Also in the book, not in this scene (their full entries come back when they are): ${away.join('; ')}.`);
     const watch = watchLines({ hypnosis: kinds.includes('hypnosis') ? b.hypnosis : [], control: kinds.includes('control') ? b.control : [], perception: kinds.includes('perception') ? b.perception : [] }, { latest, recent, userName });
     if (!parts.length && !watch.length) return '';
