@@ -5,11 +5,8 @@ A SillyTavern extension for metaphysics roleplay: possession, body swaps, mind c
 It keeps the rules, the bodies, and the prose straight, so the model stops getting them wrong.
 </p>
 
-<p align="center">
-<img src="docs/images/chat-bodies.png" width="400" alt="One player running three bodies at a party, in SillyTavern's own look: the bodies strip above the chat, a possession box, a color-coded line for each body, and a tab per body on the message box">
-<img src="docs/images/stage-chat.png" width="400" alt="The same party in Stage mode: the story as narration, each speaker's line beside their face, a scene divider with the story's time, and who was possessed on the possession card">
-</p>
-<p align="center"><sub>The same party in SillyTavern's own look, and in <a href="#-stage-mode">Stage mode</a>.</sub></p>
+<p align="center"><img src="docs/images/stage-window.png" width="820" alt="Stage mode on a wide screen: the Board pulled down over the top of the chat, with Sam at home and Jess, Tori, Bea, and Dev at the party, lines from Sam to the two bodies Sam is in; and the Body Ledger open as a sheet on the right"></p>
+<p align="center"><sub>New in 2.0: <a href="#-stage-mode">Stage mode</a>, an optional new look with a Board of who is where, here with the Body Ledger open as a sheet.</sub></p>
 
 It pairs with the [Worldhopper presets](https://coz-rp.github.io/) (a flagship for every model, plus one each for Claude, Gemini, DeepSeek, GLM, and Kimi and MiMo), and works with any other preset, Chat Completion or Text Completion. With a Worldhopper preset, switch on its ✚ Metaphysics Check in metaphysics chats (the Modes panel offers to when it's off): it reads the Body Ledger and Mind Book before each reply.
 
@@ -304,13 +301,11 @@ Each marker closes with its slash twin (`%%/trance%%`). The model only sees thes
 
 ## 🎬 Stage mode
 
-<p align="center"><img src="docs/images/stage-window.png" width="800" alt="Stage mode on a wide screen: the Board pulled down over the top of the chat, with Sam at home and Jess, Tori, Bea, and Dev at the party, lines from Sam to the two bodies Sam is in; and the Body Ledger open as a sheet on the right"></p>
+<img src="docs/images/stage-chat.png" width="320" align="right" alt="A party in Stage mode: the story as narration, each speaker's line beside their face, a scene divider with the story's time, and who was possessed on the possession card">
 
 An optional new look for all of SillyTavern, built for the Engine. It ships **off**: switch it on at the top of the Worldhopper panel, from the wand menu, or with the masks at the end of the bodies strip. It says what it changes before it turns on, and switching it off puts everything back as it was. Nothing in your chats, cards, or settings is changed either way.
 
 **The look.** The top bar, menus, buttons, popups, the chat, and the message box get Worldhopper's own style, drawn in your theme's colors. It works with or without [Moonlit Echoes](https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme): with it, Stage takes Moonlit Echoes' theme colors and sizes; Moonlit Echoes' picture-led chat styles (Echo, Whisper, Hush, Ripple, Tide) step aside while Stage is on and come back when it's off.
-
-<img src="docs/images/stage-board.png" width="340" align="right" alt="The Board: Sam's apartment with Sam on the couch, and Jess and Tori's apartment with Jess, Tori, Bea, and Dev, with your face small on Jess and Tori and lines running from Sam to them">
 
 **The chat**, read like a story:
 
@@ -319,6 +314,10 @@ An optional new look for all of SillyTavern, built for the Engine. It ships **of
 - A scenario card's picture steps aside, and its name gives way to where the scene is (from the World notes). A card that is a person has their face on their own lines.
 - Where the story jumps in time or changes place, a divider shows the story's day and time ("Tuesday, 3:45 PM · an hour later").
 - Your messages show the body you wrote them from, with your own face small on it, and your `[Jess]` lines carry Jess's face.
+
+<br clear="right">
+
+<img src="docs/images/stage-board.png" width="340" align="right" alt="The Board: Sam's apartment with Sam on the couch, and Jess and Tori's apartment with Jess, Tori, Bea, and Dev, with your face small on Jess and Tori and lines running from Sam to them">
 
 **The Board.** The bodies strip becomes a band at the top of the chat. Pull it down, or tap it, and the Board drops over the top of the chat: everyone the story is using, gathered into the places the World notes have them in, a rider's face on the body they're in, and a line from the rider's own body to it. Tap a face for their card.
 
