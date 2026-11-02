@@ -6,6 +6,7 @@
 // by their own call, alongside the Ledger's, so the Ledger's prompt stays as it is and nothing waits longer.
 
 import { aliasResolver, normalizeLedger } from './ledger-core.js';
+import { cutShort, fitText } from './text-core.js';
 
 /** Who is in which body, as plain lines for the World update to read alongside the messages. */
 export function bodyLines(ledger) {
@@ -22,19 +23,21 @@ const lc = s => str(s).toLowerCase();
 const NOBODY = /^(none|nobody|no one|n\/a|null|-|unknown)$/i;
 const person = v => (NOBODY.test(str(v)) ? '' : str(v, 60));
 
+// The longer fields end at a word and a whole thought (fitText), never mid-word; they were sliced at a fixed length
+// before ("…heart rate up, warm heavy feeling building, arms getting hea"), and notes cut that way are trimmed back.
 export function normalizeWorld(raw) {
     const things = (Array.isArray(raw?.things) ? raw.things : []).map(t => ({
-        what: str(t?.what, 80), whose: person(t?.whose), holder: person(t?.holder), where: str(t?.where, 100),
+        what: fitText(t?.what, 100, 80), whose: person(t?.whose), holder: person(t?.holder), where: fitText(t?.where, 140, 100),
     })).filter(t => t.what).slice(0, 24);
     const knows = (Array.isArray(raw?.knows) ? raw.knows : []).map(k => ({
         who: person(k?.who),
-        facts: (Array.isArray(k?.facts) ? k.facts : k?.fact ? [k] : []).map(f => ({ fact: str(f?.fact ?? f, 160), how: str(f?.how, 24) })).filter(f => f.fact).slice(0, 6),
+        facts: (Array.isArray(k?.facts) ? k.facts : k?.fact ? [k] : []).map(f => ({ fact: fitText(f?.fact ?? f, 220, 160), how: str(f?.how, 24) })).filter(f => f.fact).slice(0, 6),
     })).filter(k => k.who && k.facts.length).slice(0, 24);
     const people = (Array.isArray(raw?.people) ? raw.people : []).map(p => ({
-        who: person(p?.who), where: str(p?.where, 100), wearing: str(p?.wearing, 140), state: str(p?.state, 120),
+        who: person(p?.who), where: fitText(p?.where, 140, 100), wearing: fitText(p?.wearing, 200, 140), state: fitText(p?.state, 200, 120),
     })).filter(p => p.who && (p.where || p.wearing || p.state)).slice(0, 24);
     const clock = { day: str(raw?.clock?.day, 40), time: str(raw?.clock?.time, 40), elapsed: Math.max(0, parseInt(raw?.clock?.elapsed, 10) || 0) };
-    const timers = (Array.isArray(raw?.timers) ? raw.timers : []).map(t => ({ what: str(t?.what, 100), when: str(t?.when, 60) })).filter(t => t.what && t.when).slice(0, 12);
+    const timers = (Array.isArray(raw?.timers) ? raw.timers : []).map(t => ({ what: fitText(t?.what, 120, 100), when: str(t?.when, 60) })).filter(t => t.what && t.when).slice(0, 12);
     return { things, knows, people, clock, timers };
 }
 
@@ -179,7 +182,7 @@ export async function worldStep({ world = null, messages, context = [], userName
     let answer = await ask(msgs, 1500);
     let next = parseWorldUpdate(answer, world || EMPTY_WORLD, ledger);
     // Cut off partway (a model that thinks first can run out of room): once more with plenty.
-    if (!next) { answer = await ask(msgs, 4000); next = parseWorldUpdate(answer, world || EMPTY_WORLD, ledger); }
+    if (!next && cutShort(answer)) { answer = await ask(msgs, 4000); next = parseWorldUpdate(answer, world || EMPTY_WORLD, ledger); }
     return next ? { world: next, answer } : null;
 }
 

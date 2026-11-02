@@ -299,9 +299,10 @@ body.wh-stage #chat .mes_text .whs-say.whs-cont { margin-top: -4px; }
     background: linear-gradient(135deg, rgba(var(--whs-npc), 0.1), color-mix(in srgb, var(--whs-ink) 3%, transparent));
     border-color: rgba(var(--whs-npc), 0.3);
 }
-/* Someone only doing something: their face and name, the page's own text, no speech bubble. */
-.whs-act .whs-say-bubble { background: none; border-color: transparent; padding: 2px 4px 2px 2px; }
 .whs-cont .whs-say-bubble { border-top-left-radius: 16px; }
+/* A face is tapped for a closer look, the way a card's picture is. */
+.whs-say-face, .whs-say-face .whs-rider { cursor: zoom-in; }
+.whs-say-face:focus-visible { outline: 2px solid var(--whs-cool); outline-offset: 2px; border-radius: 50%; }
 .whs-say-name {
     display: block;
     margin-bottom: 2px;
@@ -314,8 +315,8 @@ body.wh-stage #chat .mes_text .whs-say.whs-cont { margin-top: -4px; }
 .whs-say-npc .whs-say-name { color: color-mix(in srgb, rgb(var(--whs-npc)) 75%, #fff); }
 .whs-cont .whs-say-name { display: none; }
 body.wh-stage #chat .mes_text .whs-say-bubble p { margin: 0 !important; }
-.whs-say:not(.whs-act) .whs-say-bubble em { color: var(--whs-ink-2); }
-/* Where the reply happens, from the World notes: a scenario card's name gives way to it. */
+.whs-say-bubble em { color: var(--whs-ink-2); }
+/* Where the reply happens, from the World notes: the card's name gives way to it. */
 .whs-where {
     margin-left: 8px;
     font-variant: all-small-caps;
@@ -326,8 +327,8 @@ body.wh-stage #chat .mes_text .whs-say-bubble p { margin: 0 !important; }
     white-space: nowrap;
 }
 .whs-where i { color: var(--whs-hot); margin-right: 2px; font-size: 0.85em; }
-body.wh-stage #chat .mes.whs-scene-card.whs-placed .name_text { display: none !important; }
-body.wh-stage #chat .mes.whs-scene-card .whs-where { margin-left: 0; color: var(--whs-cool); }
+body.wh-stage #chat .mes.whs-head[is_user="false"] .name_text { display: none !important; }
+body.wh-stage #chat .mes.whs-head[is_user="false"] .whs-where { margin-left: 0; color: var(--whs-cool); }
 /* Your message as the body you were in, your own face small on it. */
 body.wh-stage #chat .mes .avatar { position: relative; }
 .whs-av-rider {

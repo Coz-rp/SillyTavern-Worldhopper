@@ -309,9 +309,9 @@ An optional new look for all of SillyTavern, built for the Engine. It ships **of
 
 **The chat**, read like a story:
 
-- Narration stays on the page, and what someone says or does sits beside their face, under their name: the Engine's picture of them, their card's avatar, or your persona's. A body someone else is riding carries the rider's face, small.
+- Narration stays on the page, and what someone says sits beside their face, under their name: the Engine's picture of them, their card's avatar, or your persona's. A body someone else is riding carries the rider's face, small, your own body included when someone has taken it. Tap a face to see it big, the way you would a card's picture; someone with no picture yet gets their picture card, to draw or add one.
 - Who's speaking is read from the prose itself: the name beside the words, or the one person a "she says" can be. When it can't tell, the line stays narration rather than getting the wrong face.
-- A scenario card's picture steps aside, and its name gives way to where the scene is (from the World notes). A card that is a person has their face on their own lines.
+- The card's picture and name step aside: each reply is headed by where the scene is (from the World notes), and the people in it carry their own names and faces.
 - Where the story jumps in time or changes place, a divider shows the story's day and time ("Tuesday, 3:45 PM · an hour later").
 - Your messages show the body you wrote them from, with your own face small on it, and your `[Jess]` lines carry Jess's face.
 
@@ -377,7 +377,7 @@ Everything else (mode reminders, detail entries, the strip, the body tabs, the W
 | Setting | What it does | Default |
 |---|---|---|
 | Body Ledger & Mind Book | Tracks bodies and powers, the World notes, and what hypnosis, mind control, altered perception, and change over time have put into people, after replies in chats with those modes. Off, the mode rules still apply, but nothing runs in the background and your send never waits | On |
-| Draw pictures on their own | Draws each new host once their sheet is written, and each new person in the Mind Book. Off, tap a face to draw it. See [Pictures](#️-pictures) | Off |
+| Draw pictures on their own | Draws each new host once their sheet is written, each new person in the Mind Book, and, in Stage mode, anyone with a line in the latest replies. Off, tap a face to draw it. See [Pictures](#️-pictures) | Off |
 | Your pronouns | Your pronouns for the persona you're using, kept per persona (also under its description in Persona Management) | Empty |
 | Pictures: style, model, workflow, shape, prompt | What these pictures are drawn with, over your Image Generation setup: its own styles, models, and (for a source that has them) workflows; square head-and-shoulders (up to 1024×1024) or as set; and the prompt as written, or rewritten into tags by Image Generation's own template | As set; square; as written |
 | Codex lorebook | Which lorebook holds the mode rules | WH Metaphysics |
@@ -435,6 +435,7 @@ Stage mode sends nothing anywhere: it all happens in your browser. Nothing else 
 - **The Ledger stays off.** It only runs with a mode where someone inhabits another body (Possession, Skinsuit, Hive Mind, and the like); otherwise check that it's on under Settings → Choices and has a model.
 - **The roleplay model ignores the mode reminders or the Ledger.** The Engine places them near the end of the prompt as system messages, and some providers drop or ignore system messages that come after the chat (Claude Sonnet through NanoGPT did, in testing). In your connection settings, set **Prompt Post-Processing** to **Semi-strict (no tools)**, which hands them to the model as part of the last message.
 - **Text Completion.** The Codex, the Ledger, the World notes, and the body checks work the same as with Chat Completion.
+- **A local model takes ages, keeps asking, or writes story where the update should be.** Each update sends instructions plus the latest messages, about 4,000 tokens, so the model needs a context of **8192 tokens or more**: set it where the model is loaded (KoboldCpp's Context Size, Ollama's num_ctx) and as **Context (tokens)** in SillyTavern. With less, the Engine trims the middle of the messages to fit, and warns you once if even its instructions don't (a server handed more than it holds cuts the instructions off the front, and the model just carries on the story). On a local model the Engine asks one thing at a time. Running the Engine on the same model you roleplay with works, but every update pushes the roleplay prompt out of the server's cache, so your next reply reads the whole chat again.
 - **A picture doesn't draw.** Pictures go through SillyTavern's Image Generation: turn it on (Extensions → Image Generation), pick a source, and draw one picture there to check it works. Someone without a sheet also needs a Notes model to describe them, or a look you type.
 - **Pictures don't look like the ones you usually make.** Two things do it. **Size:** a workflow with its own size draws pictures at that size, and a model or LoRA drawn far above about 1 megapixel can lose its look (an anime LoRA turning out photos); give pictures a workflow of their own at about 1 megapixel. **Style words:** the look you usually get may come from words in your prompts; put them in a Style and pick it under Settings → Pictures. With a tag-based model, also set Prompt to **Rewritten by Image Generation**.
 - **Test this card says to reload.** It needs one SillyTavern reload after installing or updating the extension.

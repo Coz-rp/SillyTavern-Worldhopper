@@ -68,10 +68,22 @@ const section = (title, icon, count) => el('div', 'wh-dos-section').append(fa(ic
 
 // ------------------------------------------------------------------ forms
 
+// Every field wraps and grows with what's in it, so a long value is all in view: a one-line box showed only what fit
+// its width, and the rest came into view only as you deleted. A "line" is still one line of text: Enter saves it, and
+// a line break pasted in becomes a space.
 const input = (k, label, ph, value, cls = '') => el('label', `wh-dos-f ${cls}`).append(el('small', '', label),
-    $('<input type="text" class="text_pole">').attr({ 'data-k': k, placeholder: ph }).val(value ?? ''));
+    $('<textarea class="text_pole wh-dos-line" rows="1"></textarea>').attr({ 'data-k': k, placeholder: ph }).val(value ?? ''));
 const area = (k, label, ph, value, rows = 2) => el('label', 'wh-dos-f wh-dos-full').append(el('small', '', label),
     $('<textarea class="text_pole"></textarea>').attr({ 'data-k': k, placeholder: ph, rows }).val(value ?? ''));
+// Where the browser can't size a field to its text by itself (CSS field-sizing), it's done here as you type.
+const SIZES_ITSELF = !!window.CSS?.supports?.('field-sizing', 'content');
+function sizeField(t) {
+    if (SIZES_ITSELF || !t.offsetParent) return;
+    const rows = Number(t.getAttribute('rows')) || 1;
+    t.style.height = 'auto';
+    const line = parseFloat(getComputedStyle(t).lineHeight) || 20;
+    t.style.height = `${Math.max(t.scrollHeight, rows * line) + t.offsetHeight - t.clientHeight}px`;
+}
 const choose = (k, label, options, value) => el('label', 'wh-dos-f').append(el('small', '', label),
     $('<select class="text_pole"></select>').attr('data-k', k).append(options.map(o => $('<option></option>').val(o).text(o || '—'))).val(value ?? ''));
 const tick = (k, label, checked) => el('label', 'checkbox_label wh-dos-full').append($('<input type="checkbox">').attr('data-k', k).prop('checked', !!checked), el('span', '', label));
@@ -79,7 +91,10 @@ const grid = (...fields) => el('div', 'wh-dos-fields').append(fields);
 /** What a form holds, by data-k (a checkbox reads 'yes' or 'no'). */
 function readForm(form) {
     const o = {};
-    form.find('[data-k]').each((_, x) => { o[$(x).attr('data-k')] = x.type === 'checkbox' ? (x.checked ? 'yes' : 'no') : String($(x).val() ?? ''); });
+    form.find('[data-k]').each((_, x) => {
+        const v = x.type === 'checkbox' ? (x.checked ? 'yes' : 'no') : String($(x).val() ?? '');
+        o[$(x).attr('data-k')] = x.classList.contains('wh-dos-line') ? v.replace(/\s*\n\s*/g, ' ') : v;
+    });
     return o;
 }
 
@@ -107,10 +122,13 @@ function openForm(node, { fields, save, remove, removeLabel = 'Remove', refresh,
     ));
     // Enter in a one-line field saves; Escape anywhere in the form cancels just the form, not the whole view.
     form.on('keydown', 'input, textarea, select', e => {
-        if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') { e.preventDefault(); ok(); }
+        const line = (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') || e.target.classList.contains('wh-dos-line');
+        if (e.key === 'Enter' && !e.shiftKey && line) { e.preventDefault(); ok(); }
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(); }
     });
+    form.on('input', 'textarea', e => sizeField(e.target));
     node.replaceWith(form);
+    form.find('textarea').each((_, t) => sizeField(t));
     form.find('input, textarea, select').first().trigger('focus');
 }
 
@@ -278,7 +296,7 @@ export function ledgerView(d, a) {
         if (p.history.length) {
             box.append(el('div', 'wh-dos-list-title', 'Past rides'));
             for (const h of p.history) {
-                const lines = h.lines.slice(0, 2).map(([label, value]) => el('div', 'wh-dos-tl-line').append(el('span', 'wh-dos-label', label), el('span', '', value)));
+                const lines = h.lines.map(([label, value]) => el('div', 'wh-dos-tl-line').append(el('span', 'wh-dos-label', label), el('span', '', value)));
                 box.append(part(el('div', 'wh-dos-ride').append(el('div', 'wh-dos-tl-title').append(el('span', '', h.title), h.hidden ? fa('fa-eye-slash') : ''), lines), {
                     fields: grid(...HISTORY_FIELDS(h.raw)), save: v => a.saveHistory(h.keys, h.lastEnd, v), remove: () => a.removeHistory(h.keys, h.lastEnd, h.title), wide: true,
                 }, a.refresh, { label: 'this ride' }));

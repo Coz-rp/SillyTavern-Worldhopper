@@ -17,7 +17,7 @@ import { ConnectionManagerRequestService } from '../../shared.js';
 import { getPresetManager } from '../../../preset-manager.js';
 import { promptManager } from '../../../openai.js';
 import { loadWorldInfo, saveWorldInfo, updateWorldInfoList, world_names } from '../../../world-info.js';
-import { looksLikeRoleplay } from './text-core.js';
+import { looksLikeRoleplay, fitToContext } from './text-core.js';
 import { MODE_GROUPS, MODIFIERS, PARENT, ALL_MODES, MODE_BLURBS, expandModes, planEntry, buildSuggestMessages, parseSuggestResponse, DISPLAY_SCRIPTS } from './codex-core.js';
 import {
     EMPTY_LEDGER, normalizeLedger, ledgerStep, renderLedger, akaOf, aliasResolver, personNamedIn,
@@ -31,10 +31,10 @@ import { EMPTY_WORLD, normalizeWorld, worldStep, renderWorld, bodyLines, timeLef
 import { describesMinor, buildPersonaMessages, parsePersona, personaText, personaKey, sheetFromFields, buildLookMessages, parseLook, portraitPrompt, glance, glanceParts, LOOK_WORDS } from './persona-core.js';
 import { ledgerPeople, mindPeople } from './people-core.js';
 import { boardOf, splitWhere, sceneBreak, ridesChanged } from './board-core.js';
-import { applyStageLook, renderBoard, bindPull, justPulled, readParagraph, replyParagraphs, isStaged, stageReply, stageUser, stageWhere, stageScene, stageMoments, stageLanes, unstage, openSheet, closeSheet } from './stage.js';
-import { speakers, cardPronouns } from './speech-core.js';
+import { applyStageLook, renderBoard, bindPull, justPulled, readParagraph, replyParagraphs, isStaged, stageReply, stageUser, stageWhere, stageScene, stageMoments, stageLanes, unstage, openSheet, closeSheet, zoomPicture } from './stage.js';
+import { speakers, cardPronouns, prosePronouns } from './speech-core.js';
 import { ledgerView, mindView, pictureView, rulesView, convertView } from './views.js';
-import { user_avatar } from '../../../personas.js';
+import { user_avatar, getUserAvatar } from '../../../personas.js';
 import { shouldSendOnEnter } from '../../../RossAscends-mods.js';
 import { MIND_MODES, KINDS as MIND_KINDS, EMPTY_BOOK, normalizeBook, isEmptyBook, needsUpdate, mindStep, renderMindBook, trappedSelfCuts, resistanceSetUp, changeStage } from './mind-core.js';
 import { makeFix, makeChecksFix, fixFileName, FIX_KINDS, FIX_LABELS } from './correct-core.js';
@@ -123,11 +123,29 @@ function profileByName(name) {
     return ctx().extensionSettings.connectionManager?.profiles?.find(p => p.name === name);
 }
 
+// Text Completion services that aren't on your own machine (the rest are: KoboldCpp, llama.cpp, Ollama, and so on).
+const HOSTED_TC = ['openrouter', 'featherless', 'mancer', 'infermaticai', 'dreamgen', 'togetherai', 'huggingface'];
+/**
+ * Whether a profile runs a model on your own machine (or your network): a Text Completion backend like KoboldCpp, or a
+ * Chat Completion "custom" endpoint at a local address. Such a server answers one request at a time, in the context it
+ * was started with.
+ */
+function isLocalProfile(name) {
+    const p = profileByName(name);
+    if (!p) return false;
+    if (p.mode !== 'cc') return !HOSTED_TC.includes(p.api);
+    let host = '';
+    try { host = new URL(p['api-url'] || '').hostname; } catch { return false; }
+    return p.api === 'custom' && /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|\[?::1\]?$)|\.(local|lan|localhost|ts\.net)$/i.test(host);
+}
+
+const warnedSmall = new Set();   // profiles already told their context is too small, this session
 /** Send messages through a connection profile (Text or Chat Completion). Returns the text, or throws. `signal` aborts it. */
 async function askProfile(name, messages, maxTokens, temperature, { signal = null } = {}) {
     if (!name) throw new Error('no model picked (Worldhopper → Settings → Models)');
     const profile = profileByName(name);
     if (!profile) throw new Error(`connection profile “${name}” not found`);
+    const local = isLocalProfile(name);
     if (profile.mode === 'cc') {
         const custom = { stream: false, extractData: true, includePreset: true, includeInstruct: false, signal };
         const send = async max => {
@@ -136,9 +154,22 @@ async function askProfile(name, messages, maxTokens, temperature, { signal = nul
         };
         const text = await send(maxTokens);
         // A model that thinks before it answers can spend the whole limit on hidden reasoning and send back nothing:
-        // Haiku 5.5 on OpenRouter does, even at low effort. One retry with room to spare (a ceiling, not a cost).
-        return text.trim() || signal?.aborted ? text : send(Math.max(4 * maxTokens, 4000));
+        // Haiku 5.5 on OpenRouter does, even at low effort. One retry with room to spare (a ceiling, not a cost). A
+        // local server gets less: its room comes out of the same context the prompt has to fit in.
+        if (text.trim() || signal?.aborted) return text;
+        return send(local ? Math.min(2 * maxTokens, 2000) : Math.max(4 * maxTokens, 4000));
     }
+    // Text Completion: SillyTavern asks the server to keep the prompt within your Context (tokens) setting, and a server
+    // asked for more cuts the prompt's beginning, the instructions, so the model carries on the story instead of doing
+    // the job. Fit the prompt (and the answer's room) to that context first.
+    const context = Number(ctx().maxContext) || 0;
+    const fit = fitToContext(messages, maxTokens, context);
+    if (!fit.fits && !warnedSmall.has(name)) {
+        warnedSmall.add(name);
+        toastr.warning(`“${name}” works in ${context} tokens (Context in SillyTavern's settings), too few for Worldhopper's instructions and the chat. 8192 or more works; set the same size where the model is loaded.`, 'Worldhopper', { timeOut: 20000 });
+    }
+    messages = fit.messages;
+    maxTokens = fit.maxTokens;
     // A background request ends on the instruct's quiet sequence, which skips the reply-turn prefill (for Gemma 4
     // WH, the empty thought channel). Without it Gemma opens a thought block, hits the "<|channel>thought" stop
     // string, and returns nothing. So end on the template's normal reply opening instead.
@@ -841,7 +872,10 @@ async function updateLedger(mesId, { rebuild = false, save = true } = {}) {
     try {
         step = await ledgerStep(input, first ? (m, max) => askLedger(m, max, 0.1) : askBodies);
     } catch (err) { ledgerStatus(`Ledger: ${unreachable(ledgerProfile())}.`); return fail; }
-    if (!step) { ledgerStatus('Ledger: the model\'s answer was unreadable; kept the previous ledger.'); return fail; }
+    if (!step) {
+        ledgerStatus(`Ledger: the model's answer was unreadable; kept the previous ledger.${isLocalProfile(ledgerProfile()) ? ' A local model that writes story here instead of the update has lost its instructions: a larger context (8192 or more) or a stronger model helps.' : ''}`);
+        return fail;
+    }
     if (step.log.added.length) console.log(LOG, 'new body changes checked', step.log.added);
     if (step.log.ended.length) console.log(LOG, 'ended body changes checked', step.log.ended);
     const next = step.ledger;
@@ -1239,6 +1273,19 @@ function faceFor(name, kind = 'idle') {
     return { image: pictureOf(name), busy: viewBusy.get(`pic:${k}`) || '', open: () => openPicture(name, kind) };
 }
 
+/**
+ * A face in Stage's chat, tapped: shown big, the way a card's picture is (the card's full picture, your persona's, or
+ * the one the Engine drew). Someone with no picture yet gets their picture card, to draw or add one.
+ */
+function zoomFace(name) {
+    const c = ctx();
+    const ch = cardCharacter(name);
+    const src = same(name, c.name1) ? (user_avatar ? getUserAvatar(user_avatar) : '')
+        : ch ? `/characters/${encodeURIComponent(ch.avatar)}` : pictureOf(name);
+    if (src) zoomPicture(name, src);
+    else openPicture(name);
+}
+
 /** Image Generation is on (its /imagine command is there). */
 const imageGenOn = () => !!ctx().extensionSettings?.sd && !!ctx().SlashCommandParser?.commands?.imagine;
 /** One of Image Generation's own settings, when it applies to the source it's set to (going by its settings panel). */
@@ -1474,6 +1521,8 @@ async function ensurePictures() {
         for (const h of book?.hypnosis || []) people.push(h.who);
         for (const w of book?.control || []) people.push(...w.who);
     }
+    // In Stage mode, anyone with a line in the latest replies too: the story's people get faces of their own.
+    if (stageOn()) people.push(...stageSpeakers());
     const skip = cardNames();
     for (const name of people) {
         const k = personaKey(name);
@@ -2585,13 +2634,36 @@ function castOf(ledger, world, people, cardPeople, pronouns = {}) {
     };
     for (const b of ledger.bodies) { add(b.body, { pronouns: b.pronouns }); add(b.driver, { pronouns: b.driver_pronouns }); }
     for (const a of ledger.aliases) add(a.name, { aka: a.aka });
-    for (const p of world.people) add(p.who);
+    // "Sam's body" in the World notes is Sam.
+    for (const p of world.people) add(String(p.who || '').replace(/['’]s\s+(?:own\s+)?body$/i, ''));
     for (const k of world.knows) add(k.who);
     for (const n of people) add(n);
     for (const n of cardPeople) add(n);
     // What the cards say about pronouns, for anyone the Ledger has none for.
     for (const p of out.values()) p.pronouns ||= pronouns[p.name.toLowerCase()] || pronouns[p.name.split(/\s+/)[0].toLowerCase()] || '';
     return [...out.values()];
+}
+
+/** Who has a line in the latest replies on the page, in Stage mode. */
+function stageSpeakers() {
+    const replies = [...document.querySelectorAll('#chat .mes[is_user="false"]')].slice(-SCENE_MESSAGES);
+    return [...new Set(replies.flatMap(m => [...m.querySelectorAll('.whs-say[data-who]')].map(n => n.dataset.who)))];
+}
+
+const notCopy = b => !/cop(y|ied)|propagat/i.test(b.how || '');
+/** Where the World notes have someone, also when they list them as "Sam's body" (your own, left behind or in use). */
+function whereIs(world, name, canon) {
+    const strip = w => String(w || '').replace(/['’]s\s+(?:own\s+)?body$/i, '');
+    return (world.people.find(p => canon(p.who) === canon(name)) || world.people.find(p => canon(strip(p.who)) === canon(name)))?.where || '';
+}
+/** You in a Ledger: the bodies you drive, and whether someone else drives yours. */
+function yoursIn(ledger, me) {
+    const canon = aliasResolver(ledger);
+    return {
+        canon,
+        worn: ledger.bodies.filter(b => b.driver && b.body && !/^none$/i.test(b.body) && canon(b.driver) === canon(me) && canon(b.body) !== canon(me) && notCopy(b)),
+        taken: ledger.bodies.some(b => b.body && b.driver && canon(b.body) === canon(me) && canon(b.driver) !== canon(me) && notCopy(b)),
+    };
 }
 
 function stageChat() {
@@ -2604,7 +2676,10 @@ function stageChat() {
     const group = c.groupId ? c.groups?.find(x => x.id === c.groupId) : null;
     const cards = group ? (group.members || []).map(av => c.characters?.find(x => x.avatar === av)).filter(Boolean) : [c.characters?.[c.characterId]].filter(Boolean);
     const prose = chat.slice(-12).filter(m => inStory(m) && !m.is_user).map(m => m.mes).join('\n');
-    const pronouns = Object.assign({}, ...cards.map(ch => cardPronouns(cardText(ch))));
+    // Pronouns as the cards give them, else as the story's own prose makes clear (someone with none fits any "she
+    // says"); the Ledger's own come first, in castOf.
+    const everyone = castOf(normalizeLedger(headLedger()?.ledger || EMPTY_LEDGER), normalizeWorld(headWorld()?.world || EMPTY_WORLD), sheets, cards.map(ch => ch.name)).map(p => p.name);
+    const pronouns = Object.assign(prosePronouns([prose], everyone), ...cards.map(ch => cardPronouns(cardText(ch))));
     const showHidden = !!settings().stage.hidden;
     let ledger = c.chatMetadata?.[LEDGER_KEY] ? normalizeLedger(c.chatMetadata[LEDGER_KEY]) : normalizeLedger(EMPTY_LEDGER);
     let world = normalizeWorld(EMPTY_WORLD);
@@ -2617,23 +2692,30 @@ function stageChat() {
         if (i >= first) {
             const node = document.querySelector(`#chat .mes[mesid="${i}"]`);
             if (node && inStory(m)) {
-                const canon = aliasResolver(ledger);
-                const worn = ledger.bodies.filter(b => b.driver && b.body && !/^none$/i.test(b.body) && canon(b.driver) === canon(me) && canon(b.body) !== canon(me) && !/cop(y|ied)|propagat/i.test(b.how));
                 if (m.is_user) {
+                    const { worn } = yoursIn(ledger, me);
                     stageUser(node, worn.length === 1 ? { name: worn[0].body, image: faceFor(worn[0].body).image || '', you: me } : null);
                     stageLanes(node, name => faceFor(name).image || '');
                 } else {
-                    const records = new Set([...ledger.bodies.flatMap(b => [b.body, b.driver]), ...world.people.map(p => p.who), ...world.knows.map(k => k.who), ...sheets].filter(Boolean).map(n => n.toLowerCase()));
+                    // The reply as its own Ledger and World notes have it: someone who first turns up in it, or a body
+                    // taken in it, already counts for its lines.
+                    const now = m.extra?.wh_ledger ? normalizeLedger(m.extra.wh_ledger) : ledger;
+                    const worldNow = m.extra?.wh_world ? normalizeWorld(m.extra.wh_world) : world;
+                    const { canon, worn, taken } = yoursIn(now, me);
+                    const records = new Set([...now.bodies.flatMap(b => [b.body, b.driver]), ...worldNow.people.map(p => p.who), ...worldNow.knows.map(k => k.who), ...sheets].filter(Boolean).map(n => n.toLowerCase()));
                     const persons = cards.filter(ch => cardIsPerson(ch, records, prose)).map(ch => ch.name);
-                    const cast = castOf(ledger, world, sheets, persons, pronouns);
-                    const mine = [me, ...worn.map(b => b.body)];
+                    // You're in the cast too, so a line of yours is known for yours (and not handed to whoever spoke last).
+                    const cast = castOf(now, worldNow, sheets, [...persons, me], { ...pronouns, [me.toLowerCase()]: userPronouns() || pronouns[me.toLowerCase()] || '' });
+                    // Someone else in your body (taken, or absorbed into a hive): its lines are the story's now.
+                    const mine = [...(taken ? [] : [me]), ...worn.map(b => b.body)];
                     const text = chat.slice(Math.max(0, i - SCENE_MESSAGES + 1), i + 1).filter(inStory).map(x => x.mes).join('\n');
                     const scene = [...new Set([...cast.filter(p => personNamedIn(text, [p.name, ...p.aka])).map(p => p.name), ...persons])];
                     // Who the reply's moments happened to: the rides it began and ended since the last reply.
-                    const changed = ridesChanged(lastReply, m.extra?.wh_ledger || ledger);
+                    const changed = ridesChanged(lastReply, now);
                     const withFaces = r => ({ ...r, riderImage: faceFor(r.rider).image || '', bodyImage: faceFor(r.body).image || '', you: canon(r.rider) === canon(me) });
                     const moments = { began: changed.began.filter(r => !r.hidden || showHidden).map(withFaces), ended: changed.ended.filter(r => !r.hidden || showHidden).map(withFaces) };
-                    const sig = [m.mes, m.swipe_id ?? 0, cast.map(p => p.name).join('|'), mine.join('|'), carry, showHidden,
+                    // The faces too, so a picture drawn or changed shows on the lines at once.
+                    const sig = [m.mes, m.swipe_id ?? 0, cast.map(p => `${p.name}=${faceFor(p.name).image || ''}`).join('|'), mine.join('|'), carry, showHidden,
                         [...moments.began, ...moments.ended].map(r => `${r.rider}>${r.body}`).join('|')].join('\u0001');
                     if (!isStaged(node, sig)) {
                         unstage(node);
@@ -2642,29 +2724,24 @@ function stageChat() {
                         const lines = [];
                         who.forEach((w, j) => {
                             if (!w.who) return;
-                            const row = ledger.bodies.find(b => b.body && canon(b.body) === canon(w.who) && b.driver && canon(b.driver) !== canon(w.who) && !/cop(y|ied)|propagat/i.test(b.how));
+                            const row = now.bodies.find(b => b.body && canon(b.body) === canon(w.who) && b.driver && canon(b.driver) !== canon(w.who) && notCopy(b));
                             const rider = row && (row.user_knows !== 'no' || showHidden)
                                 ? { name: row.driver, image: faceFor(row.driver).image || '', you: canon(row.driver) === canon(me), hidden: row.user_knows === 'no' } : null;
-                            lines.push({ p: ps[j], name: w.who, image: faceFor(w.who).image || '', kind: row ? 'npc' : 'plain', rider, act: w.kind === 'act', cont: j > 0 && who[j - 1].who === w.who });
+                            lines.push({ p: ps[j], name: w.who, image: faceFor(w.who).image || '', kind: row ? 'npc' : 'plain', rider, cont: j > 0 && who[j - 1].who === w.who });
                         });
                         stageMoments(node, moments);
                         stageReply(node, lines, sig);
-                        node.dataset.whsLast = who.filter(w => w.who).at(-1)?.who || '';
+                        node.dataset.whsLast = who.filter(w => w.by).at(-1)?.by || '';
                     }
                     carry = node.dataset.whsLast || '';
-                    // Where it happens: the place the World notes have your body in once this reply is done. A
-                    // scenario card's name gives way to it; a person card keeps their name beside it.
-                    const after = m.extra?.wh_world ? normalizeWorld(m.extra.wh_world) : world;
-                    const ledgerAfter = m.extra?.wh_ledger ? normalizeLedger(m.extra.wh_ledger) : ledger;
-                    const canonAfter = aliasResolver(ledgerAfter);
-                    const body = ledgerAfter.bodies.find(b => b.driver && b.body && !/^none$/i.test(b.body) && canonAfter(b.driver) === canonAfter(me) && canonAfter(b.body) !== canonAfter(me) && !/cop(y|ied)|propagat/i.test(b.how))?.body || me;
-                    const at = after.people.find(p => canon(p.who) === canon(body))?.where || '';
-                    const cardHere = cards.find(ch => ch.name === m.name);
-                    stageWhere(node, at ? upFirst(splitWhere(at).place) : '', !!cardHere && !persons.includes(cardHere.name));
+                    // Where it happens: the place the World notes have your body in once this reply is done. The
+                    // card's name gives way to it (the people in the reply carry their own names on their lines).
+                    const at = whereIs(worldNow, worn[0]?.body || me, canon);
+                    stageWhere(node, at ? upFirst(splitWhere(at).place) : '');
                     // A divider where the scene breaks: a new place, a new day, or half an hour or more gone by.
-                    const next = { place: at, day: after.clock.day, time: after.clock.time, elapsed: after.clock.elapsed };
+                    const next = { place: at, day: worldNow.clock.day, time: worldNow.clock.time, elapsed: worldNow.clock.elapsed };
                     stageScene(node, sceneBreak(lastScene, next));
-                    if (at || after.clock.day || after.clock.time) lastScene = next;
+                    if (at || worldNow.clock.day || worldNow.clock.time) lastScene = next;
                 }
             }
         }
@@ -2674,7 +2751,7 @@ function stageChat() {
         if (i < first && !m.is_user && inStory(m)) {
             const canon = aliasResolver(ledger);
             const body = ledger.bodies.find(b => b.driver && b.body && canon(b.driver) === canon(me) && canon(b.body) !== canon(me))?.body || me;
-            const at = world.people.find(p => canon(p.who) === canon(body))?.where || '';
+            const at = whereIs(world, body, canon);
             if (at || world.clock.day || world.clock.time) lastScene = { place: at, day: world.clock.day, time: world.clock.time, elapsed: world.clock.elapsed };
         }
         if (!m.is_user && inStory(m)) lastReply = ledger;
@@ -3043,6 +3120,18 @@ function noteTiming(mesId, timing) {
     if (parts.length) $('#wh_turn_timing').text(`Last turn: ${parts.join(' · ')}`);
 }
 
+/**
+ * The per-reply jobs (each a function that starts one): side by side, or one after another when the Ledger's model is
+ * local. A local server works on one request at a time anyway, some turn a second one away while busy, and each one
+ * pushes the others out of its cache, so side by side only made them all slower.
+ */
+async function runJobs(jobs) {
+    if (!isLocalProfile(ledgerProfile())) { await Promise.all(jobs.map(job => job())); return; }
+    for (const job of jobs) {
+        try { await job(); } catch (err) { console.warn(LOG, err); }
+    }
+}
+
 function onMessageReceived(mesId, type) {
     if (!on() || ['quiet', 'impersonate', 'command', 'first_message'].includes(type)) return;
     const wait = lastWait;
@@ -3061,19 +3150,16 @@ function onMessageReceived(mesId, type) {
         try {
             // The Ledger, the World notes and the Mind Book read the same reply and don't depend on each other, so they
             // run side by side: the next reply waits for the slowest of them, not their sum (2026-10-28; before, the
-            // Mind Book waited for the Ledger).
+            // Mind Book waited for the Ledger). On a local model, one after another (runJobs).
             const jobs = [];
             if (ledgerWanted() && !ledgerProfile()) ledgerStatus(`Ledger: ${unreachable('')}.`);
             else if (ledgerWanted()) {
                 setLedgerBusy(true);
-                jobs.push(Promise.all([updateLedger(mesId), updateWorld(mesId)]).then(([r, w]) => {
-                    ended = r.ended;
-                    if (r.ok) timing.ledger = r.ms;
-                    if (w) timing.world = w.ms;
-                }));
+                jobs.push(() => updateLedger(mesId).then(r => { ended = r.ended; if (r.ok) timing.ledger = r.ms; }));
+                jobs.push(() => updateWorld(mesId).then(w => { if (w) timing.world = w.ms; }));
             }
-            if (mindWanted() && ledgerProfile()) jobs.push(updateMind(mesId).then(m => { if (m) timing.mind = m.ms; }));
-            await Promise.all(jobs);
+            if (mindWanted() && ledgerProfile()) jobs.push(() => updateMind(mesId).then(m => { if (m) timing.mind = m.ms; }));
+            await runJobs(jobs);
         } finally {
             setLedgerBusy(false);
             done();
@@ -3118,10 +3204,11 @@ function rereadReply(mesId) {
             const jobs = [];
             if (ledgerWanted()) {
                 setLedgerBusy(true);
-                jobs.push(Promise.all([updateLedger(mesId), updateWorld(mesId)]).then(([r]) => { if (r.ok) ended = r.ended; }));
+                jobs.push(() => updateLedger(mesId).then(r => { if (r.ok) ended = r.ended; }));
+                jobs.push(() => updateWorld(mesId));
             }
-            if (mindWanted()) jobs.push(updateMind(mesId));
-            await Promise.all(jobs);
+            if (mindWanted()) jobs.push(() => updateMind(mesId));
+            await runJobs(jobs);
             // Each update saves the chat; side by side, an earlier save can land last, so one more with both in it.
             if (jobs.length > 1 && current()) await ctx().saveChat();
         } finally {
@@ -4076,6 +4163,13 @@ jQuery(async () => {
         addMessageButton();
         addWandButton();
         addSlashCommands();
+        // Stage mode: a speaker's face (or the rider's, small on it) is tapped for a closer look.
+        $('#chat').on('click keydown', '[data-whs-face]', function (e) {
+            if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            e.stopPropagation();   // the rider's face sits inside the speaker's
+            zoomFace(this.dataset.whsFace);
+        });
         const { eventSource, event_types } = ctx();
         eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, onEntriesLoaded);
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);

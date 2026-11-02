@@ -3,27 +3,16 @@
 // and who holds which power. A local model updates it after each reply; it is injected at depth 1 so the
 // writing model always knows which name and pronouns belong to which body and which mind.
 
-import { deleteSpan, leavesBroken } from './text-core.js';
+import { deleteSpan, leavesBroken, cutShort, fitText } from './text-core.js';
 
 export const EMPTY_LEDGER = Object.freeze({ bodies: [], powers: [], aliases: [] });
 
 const str = (v, max = 120) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const lc = s => str(s).toLowerCase();
 
-/**
- * For descriptive fields (powers, notes, host, how). Never cuts mid-word: past the limit it ends at the last clause
- * (";", ",", " — ") in the back half of the text, else at the last space. Text an older version already chopped at
- * exactly its old limit (`legacy`) is trimmed back the same way, so "…her face; original bo" reads "…her face".
- */
-function fit(v, max, legacy = 0) {
-    let s = str(v, 2000);
-    const cut = s.length > max || (legacy && s.length === legacy);
-    if (!cut) return s;
-    s = s.slice(0, s.length > max ? max : legacy);
-    const clause = Math.max(s.lastIndexOf('; '), s.lastIndexOf(', '), s.lastIndexOf(' — '), s.lastIndexOf(' ('));
-    const end = clause >= s.length * 0.5 ? clause : s.lastIndexOf(' ');
-    return (end > 0 ? s.slice(0, end) : s).replace(/[\s,;:(—-]+$/, '');
-}
+// For descriptive fields (powers, notes, host, how): text-core's fitText, which never cuts mid-word or mid-thought, and
+// trims what an older version chopped at an old limit ("…her face; original bo" reads "…her face").
+const fit = fitText;
 
 /**
  * Groups every name that refers to the same person, from the aliases of any number of ledgers (entries that share
@@ -85,16 +74,16 @@ export function normalizeLedger(raw) {
             driver: /^(none|nobody|no one|n\/a|null|-)$/i.test(str(b.driver)) ? '' : str(b.driver, 60),
             driver_pronouns: str(b.driver_pronouns, 20),
             how: fit(b.how, 60, 40),
-            host: fit(b.host, 120, 80),
+            host: fit(b.host, 160, [80, 120]),
             notes: fit(b.notes, 220, 140),
-            doing: fit(b.doing, 80),
+            doing: fit(b.doing, 140, 80),
             // Older ledgers have no field: treat as known, which is the less intrusive assumption.
             user_knows: /^\s*n/i.test(String(b.user_knows ?? '')) ? 'no' : 'yes',
         })).filter(b => (b.body || b.driver) && !(b.body && b.driver && canon(b.body) === canon(b.driver))).slice(0, 24),
         // The own body of a mind running others alongside it: off the body list, so its whereabouts live here.
-        own: (Array.isArray(raw?.own) ? raw.own : []).map(o => ({ who: str(o?.who, 60), doing: fit(o?.doing, 80), notes: fit(o?.notes, 160) }))
+        own: (Array.isArray(raw?.own) ? raw.own : []).map(o => ({ who: str(o?.who, 60), doing: fit(o?.doing, 140, 80), notes: fit(o?.notes, 220, 160) }))
             .filter(o => o.who && (o.doing || o.notes)).slice(0, 8),
-        powers: powers.map(p => ({ who: str(p.who, 60), power: fit(p.power, 240, 100) })).filter(p => p.who && p.power).slice(0, 24),
+        powers: powers.map(p => ({ who: str(p.who, 60), power: fit(p.power, 320, [100, 240]) })).filter(p => p.who && p.power).slice(0, 24),
         aliases,
     };
 }
@@ -574,8 +563,8 @@ export async function ledgerStep({ ledger = null, messages, context = [], userNa
     let answer = await ask(msgs, 900);
     let next = read(answer);
     // A model that thinks before answering can run out of room partway through the JSON (Haiku 5.5 did, 1 reply in 10):
-    // one more try with plenty of room.
-    if (!next) { answer = await ask(msgs, 4000); next = read(answer); }
+    // one more try with plenty of room. Only then: an answer that ended unreadable would only come back longer.
+    if (!next && cutShort(answer)) { answer = await ask(msgs, 4000); next = read(answer); }
     if (!next) return null;
     const log = { answer, added: [], ended: [] };
     if (!first) {

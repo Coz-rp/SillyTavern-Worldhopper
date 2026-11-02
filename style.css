@@ -792,7 +792,7 @@
 .wh-dos .wh-dos-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; }
 .wh-dos .wh-dos-titles { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .wh-dos .wh-dos-name { font-size: 1.1em; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
-.wh-dos .wh-dos-pron { font-weight: 400; opacity: 0.6; margin-left: 6px; font-size: 0.8em; }
+.wh-dos .wh-dos-pron { font-weight: 400; opacity: 0.6; margin-left: 6px; font-size: 0.8em; white-space: nowrap; display: inline-block; overflow-wrap: normal; }
 .wh-dos .wh-dos-pills { display: flex; flex-wrap: wrap; gap: 5px; }
 .wh-dos .wh-dos-pill {
     --k: var(--wh-idle);
@@ -898,7 +898,9 @@
 .wh-dos .wh-dos-f { display: flex; flex-direction: column; min-width: 0; margin: 0; gap: 2px; }
 .wh-dos .wh-dos-f small { font-size: 0.75em; opacity: 0.65; }
 .wh-dos .wh-dos-f input, .wh-dos .wh-dos-f textarea, .wh-dos .wh-dos-f select { margin: 0; }
-.wh-dos .wh-dos-f textarea { resize: vertical; min-height: 2.6em; }
+/* Fields wrap and grow with their text (field-sizing, or views.js where a browser lacks it): nothing past the edge. */
+.wh-dos .wh-dos-f textarea { field-sizing: content; resize: none; min-height: 2.6em; max-height: 50vh; overflow-y: auto; }
+.wh-dos .wh-dos-f textarea.wh-dos-line { min-height: 0; line-height: 1.4; }
 .wh-dos .wh-dos-form .checkbox_label { margin: 0; font-size: 0.9em; }
 .wh-dos .wh-dos-form-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .wh-dos .wh-dos-form-actions.wh-dos-center { justify-content: center; }
@@ -1026,7 +1028,7 @@
 .wh-dos .wh-dos-tile .wh-dos-titles { gap: 2px; }
 .wh-dos .wh-dos-tile .wh-dos-name { font-size: 1.02em; }
 .wh-dos .wh-dos-status { font-size: 0.88em; font-weight: 600; color: rgb(var(--k)); }
-.wh-dos .wh-dos-where { font-size: 0.82em; opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wh-dos .wh-dos-where { font-size: 0.82em; opacity: 0.65; overflow-wrap: anywhere; }
 .wh-dos .wh-dos-icons { display: flex; gap: 8px; flex: none; align-self: center; font-size: 0.8em; opacity: 0.6; }
 .wh-dos .wh-dos-icons > span { display: inline-flex; gap: 3px; align-items: center; }
 .wh-dos .wh-dos-detail { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid var(--wh-line); }

@@ -17,6 +17,7 @@
 // still in trance, or the mode's words in the new messages), so most turns cost nothing. Watchers add a line for the
 // reply about to be written without asking any model: a trigger word just spoken, a controlled person in the scene,
 // someone who can't perceive a person who is right there.
+import { cutShort, fitText } from './text-core.js';
 
 export const MIND_MODES = { hypnosis: 'Hypnosis', control: 'Mind Control', perception: 'Altered Perception' };
 export const KINDS = /** @type {const} */ (['hypnosis', 'control', 'perception', 'influence']);
@@ -60,9 +61,9 @@ function normSubject(h) {
         now: stageOf(h?.now) || 'awake',
         suggestions: listOf(h?.suggestions).map(x => {
             const stage = stageOf(x?.stage);
-            return { text: str(typeof x === 'string' ? x : x?.text, 220), stage: stage === 'awake' ? '' : stage, times: Math.max(1, parseInt(x?.times, 10) || 1) };
+            return { text: fitText(typeof x === 'string' ? x : x?.text, 260, 220), stage: stage === 'awake' ? '' : stage, times: Math.max(1, parseInt(x?.times, 10) || 1) };
         }).filter(x => x.text).slice(0, 12),
-        triggers: listOf(h?.triggers).map(x => ({ cue: str(x?.cue, 50).replace(/^["“']|["”']$/g, ''), effect: str(x?.effect, 180) })).filter(x => x.cue && x.effect).slice(0, 12),
+        triggers: listOf(h?.triggers).map(x => ({ cue: str(x?.cue, 50).replace(/^["“']|["”']$/g, ''), effect: fitText(x?.effect, 220, 180) })).filter(x => x.cue && x.effect).slice(0, 12),
         amnesia: yes(h?.amnesia) ? 'yes' : 'no',
         user_knows: no(h?.user_knows) ? 'no' : 'yes',
     };
@@ -75,9 +76,9 @@ function normWill(w, i) {
         by: str(w?.by, 60),
         set: listOf(w?.set ?? w?.will).map(x => {
             const kind = WILL_KINDS.find(k => canon(x?.kind).startsWith(k.split(' ')[0])) || 'wants';
-            return { kind, text: str(typeof x === 'string' ? x : x?.text, 220) };
+            return { kind, text: fitText(typeof x === 'string' ? x : x?.text, 260, 220) };
         }).filter(x => x.text).slice(0, 10),
-        own: str(w?.own ?? w?.untouched, 220),
+        own: fitText(w?.own ?? w?.untouched, 260, 220),
         resists: yes(w?.resists) ? 'yes' : 'no',
         user_knows: no(w?.user_knows) ? 'no' : 'yes',
     };
@@ -87,7 +88,7 @@ function normEdit(e, i) {
     const kind = EDIT_KINDS.find(k => canon(e?.kind).startsWith(k)) || (str(e?.target) ? 'unseen' : 'normal');
     return {
         id: str(e?.id, 8) || `p${i + 1}`,
-        what: str(e?.what, 220),
+        what: fitText(e?.what, 260, 220),
         kind,
         target: kind === 'unseen' ? str(e?.target, 60) : '',
         who: names(e?.who).slice(0, 12),
@@ -102,8 +103,8 @@ function normChange(c, i) {
     return {
         id: str(c?.id, 8) || `i${i + 1}`,
         who: str(c?.who, 60),
-        what: str(c?.what, 220),
-        from: str(c?.from, 160),
+        what: fitText(c?.what, 260, 220),
+        from: fitText(c?.from, 200, 160),
         by: str(c?.by, 60),
         times: Math.max(0, Math.min(999, parseInt(c?.times, 10) || 0)),
         last: Math.max(0, parseInt(c?.last, 10) || 0),
@@ -160,8 +161,8 @@ const WORDS = {
 
 /**
  * One Mind Book update, exactly as the extension runs it after a reply: each picked kind whose record the new messages
- * touch (every kind, on the first read) gets its own call, and the answers apply in turn. An answer that can't be read
- * is asked once more with room, since a model that thinks first can run out partway. `ask(messages, maxTokens)` returns
+ * touch (every kind, on the first read) gets its own call, and the answers apply in turn. An answer cut off before it
+ * was done is asked once more with room, since a model that thinks first can run out partway. `ask(messages, maxTokens)` returns
  * the model's text; an error from it is thrown. `at` is the message being read (when a change was last renewed) and
  * `fades` whether change fades on this card. Returns { book, ran } (ran: how many calls were made).
  */
@@ -173,8 +174,9 @@ export async function mindStep({ book = null, messages, context = [], userName =
     for (const kind of kinds) {
         if (!first && !needsUpdate(kind, b, text)) continue;
         const msgs = buildMindMessages(kind, { book: b, messages, context, userName, card: first ? card : '' });
-        let next = applyMindUpdate(kind, b, await ask(msgs, 700), { at, fades, time });
-        if (!next) next = applyMindUpdate(kind, b, await ask(msgs, 4000), { at, fades, time });
+        const answer = await ask(msgs, 700);
+        let next = applyMindUpdate(kind, b, answer, { at, fades, time });
+        if (!next && cutShort(answer)) next = applyMindUpdate(kind, b, await ask(msgs, 4000), { at, fades, time });
         ran++;
         if (next) b = next;
     }

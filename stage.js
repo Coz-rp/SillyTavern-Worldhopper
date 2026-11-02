@@ -4,6 +4,8 @@
 // the rider's own body to it; drag a face to another place to correct where they are, tap it for their card. index.js
 // gathers the data and does the saving. jQuery is SillyTavern's $.
 import { quoteRanges } from './speech-core.js';
+import { dragElement } from '../../../RossAscends-mods.js';
+import { loadMovingUIState, power_user } from '../../../power-user.js';
 
 // Moonlit Echoes' chat styles that rebuild messages around big pictures. Stage is a chat style of its own, so these step
 // aside while it's on and come back when it's off; Moonlit Echoes' colors, fonts and sizes carry on underneath.
@@ -283,19 +285,22 @@ export const isStaged = (mes, sig) => {
 
 /**
  * Draw a reply as narration and lines. lines: [{ p, name, image, kind ('npc' when someone rides them, else 'plain'),
- * rider: { name, image, you, hidden } | null, act (they only do something), cont (the same person as the line before) }],
- * each p one of replyParagraphs(mes).
+ * rider: { name, image, you, hidden } | null, cont (the same person as the line before) }], each p one of
+ * replyParagraphs(mes). A face is tapped for a closer look (the caller's handler, on data-whs-face).
  */
 export function stageReply(mes, lines, sig) {
     const text = mes.querySelector('.mes_text');
     if (!text) return;
     originals.set(text, text.innerHTML);
     for (const l of lines) {
-        const f = el('span', 'whs-say-face').append(face(l.name, l.image));
-        if (l.rider) f.append(face(l.rider.name, l.rider.image, `whs-rider ${l.rider.you ? 'whs-you' : 'whs-npc'}${l.rider.hidden ? ' whs-hidden' : ''}`).attr('title', `${l.rider.name} inside`));
+        const f = el('span', 'whs-say-face').attr({ 'data-whs-face': l.name, role: 'button', tabindex: 0, title: `${l.name}: tap for a closer look` }).append(face(l.name, l.image));
+        if (l.rider) {
+            f.append(face(l.rider.name, l.rider.image, `whs-rider ${l.rider.you ? 'whs-you' : 'whs-npc'}${l.rider.hidden ? ' whs-hidden' : ''}`)
+                .attr({ title: `${l.rider.name} inside`, 'data-whs-face': l.rider.name }));
+        }
         const bubble = el('div', 'whs-say-bubble').append(el('b', 'whs-say-name', l.name));
         // A run of one person's paragraphs reads as one: the face and name only on the first.
-        const line = el('div', `whs-say whs-say-${l.kind}${l.act ? ' whs-act' : ''}${l.cont ? ' whs-cont' : ''}`).attr('data-who', l.name).append(f, bubble);
+        const line = el('div', `whs-say whs-say-${l.kind}${l.cont ? ' whs-cont' : ''}`).attr('data-who', l.name).append(f, bubble);
         l.p.replaceWith(line[0]);
         bubble.append(l.p);
     }
@@ -304,12 +309,13 @@ export function stageReply(mes, lines, sig) {
 }
 
 /**
- * Where a reply happens, by its name: the place from the World notes. On a scenario card it stands in for the card's
- * name (no picture beside it either); a person card keeps their name and gets the place after it.
+ * Where a reply happens, at its head: the place from the World notes, in place of the card's name (the people in the
+ * reply carry their own names and faces on their lines, so the card's name over all of it was someone else's). Not
+ * placed yet, the head has the time alone.
  */
-export function stageWhere(mes, place, scenario) {
+export function stageWhere(mes, place) {
     mes.querySelectorAll('.whs-where, .whs-mid').forEach(n => n.remove());
-    mes.classList.toggle('whs-scene-card', !!scenario);
+    mes.classList.add('whs-head');
     mes.classList.toggle('whs-placed', !!place);
     // The number and timing that sat under the card's picture, beside the time instead (as SillyTavern shows them).
     const shown = n => n && getComputedStyle(n).visibility !== 'hidden' && !document.body.classList.contains(n.classList.contains('mesIDDisplay') ? 'no-mesIDDisplay' : 'no-timer');
@@ -323,10 +329,32 @@ export function stageWhere(mes, place, scenario) {
     name.after(el('span', 'whs-where').attr('title', 'Where this happens, from the World notes').append(fa('fa-location-dot'), document.createTextNode(` ${place}`))[0]);
 }
 
+/**
+ * A picture shown big, the way SillyTavern shows a card's picture when its avatar is tapped: its own window, moved by
+ * the grip and closed by ✕, and the same face tapped again closes it.
+ */
+export function zoomPicture(name, src) {
+    const key = `whs_${String(name).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '_')}`;
+    const open = $(`.zoomed_avatar[forChar="${key}"]`);
+    if (open.length) { open.fadeOut(125, () => open.remove()); return; }
+    // One at a time unless windows can be moved around (as SillyTavern does it).
+    if (!power_user.movingUI) $('.zoomed_avatar[forChar]').remove();
+    const node = $($('#zoomed_avatar_template').html()).attr({ forChar: key, id: `zoomFor_${key}` }).addClass('draggable');
+    node.find('.drag-grabber').attr('id', `zoomFor_${key}header`);
+    node.find('img').attr({ src, 'data-izoomify-url': src, alt: name }).on('dragstart', e => e.preventDefault());
+    $('body').append(node);
+    node.fadeIn(125);
+    loadMovingUIState();
+    node.css('display', 'flex');
+    dragElement(node);
+    if (power_user.zoomed_avatar_magnification) node.find('.zoomed_avatar_container').izoomify?.();
+    node.on('click touchend', e => { if (e.target.closest('.dragClose')) node.fadeOut(125, () => node.remove()); });
+}
+
 /** Put a reply back as SillyTavern drew it, and your avatar back as it was. */
 export function unstage(mes) {
     mes.querySelectorAll('.whs-where, .whs-mid, .whs-scene, .whs-lane-face').forEach(n => n.remove());
-    mes.classList.remove('whs-scene-card', 'whs-placed');
+    mes.classList.remove('whs-head', 'whs-placed');
     const text = mes.querySelector('.mes_text');
     if (text?.querySelector(':scope > .whs-staged') && originals.has(text)) text.innerHTML = originals.get(text);
     if (text) delete text.dataset.whsSig;
